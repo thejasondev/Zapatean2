@@ -1,0 +1,363 @@
+---
+/**
+ * CostDisplay.astro — Trip cost calculator card
+ * Shows estimated cost + fuel usage, with editable config.
+ */
+import { TRANSPORT_OPTIONS } from '../lib/types';
+---
+
+<div id="cost-panel" class="cost-panel">
+  <!-- Main cost display -->
+  <div id="cost-result" class="cost-result" style="display:none;">
+    <div class="cost-main">
+      <span class="cost-amount" id="cost-total">—</span>
+      <span class="cost-label">costo estimado</span>
+    </div>
+    <div id="cost-fuel" class="cost-fuel" style="display:none;">
+      <span class="fuel-icon">⛽</span>
+      <span id="cost-fuel-text">—</span>
+    </div>
+  </div>
+
+  <!-- Transport cost breakdown -->
+  <div id="cost-grid" class="cost-grid" style="display:none;">
+    {TRANSPORT_OPTIONS.map((opt) => (
+      <div class="cost-item" data-cost-profile={opt.id}>
+        <span class="cost-item-icon">{opt.icon}</span>
+        <span class="cost-item-value" data-cost-for={opt.id}>—</span>
+        <span class="cost-item-label">{opt.displayName}</span>
+      </div>
+    ))}
+  </div>
+
+  <!-- Empty state -->
+  <div id="cost-empty" class="cost-empty">
+    <p class="cost-empty-text">💰 Calcula una ruta para ver el costo estimado</p>
+  </div>
+
+  <!-- Config section (collapsible) -->
+  <button id="cost-config-toggle" class="cost-config-toggle">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
+    <span>Configurar tarifas</span>
+  </button>
+
+  <div id="cost-config" class="cost-config" style="display:none;">
+    <div class="config-group">
+      <label class="config-label">Tarifa Auto (CUP/km)</label>
+      <input type="number" id="config-auto" class="config-input" value="25" min="0" step="1" />
+    </div>
+    <div class="config-group">
+      <label class="config-label">Tarifa Moto (CUP/km)</label>
+      <input type="number" id="config-moto" class="config-input" value="15" min="0" step="1" />
+    </div>
+    <div class="config-group">
+      <label class="config-label">Precio gasolina (CUP/L)</label>
+      <input type="number" id="config-fuel" class="config-input" value="132" min="0" step="1" />
+    </div>
+    <div class="config-group">
+      <label class="config-label">Rendimiento moto (km/L)</label>
+      <input type="number" id="config-moto-kml" class="config-input" value="35" min="1" step="1" />
+    </div>
+    <div class="config-group">
+      <label class="config-label">Rendimiento auto (km/L)</label>
+      <input type="number" id="config-auto-kml" class="config-input" value="12" min="1" step="1" />
+    </div>
+  </div>
+</div>
+
+<script>
+  import { $allProfileResults, $costConfig, updateCostConfig } from '../lib/stores';
+  import { calculateTripCost, formatCUP, formatFuel } from '../lib/cost';
+  import type { TransportProfile } from '../lib/types';
+  import { saveCostConfig, loadCostConfig } from '../lib/db';
+  import { vibrateTap } from '../lib/haptics';
+
+  const costResult = document.getElementById('cost-result')!;
+  const costTotal = document.getElementById('cost-total')!;
+  const costFuel = document.getElementById('cost-fuel')!;
+  const costFuelText = document.getElementById('cost-fuel-text')!;
+  const costGrid = document.getElementById('cost-grid')!;
+  const costEmpty = document.getElementById('cost-empty')!;
+  const configToggle = document.getElementById('cost-config-toggle')!;
+  const configPanel = document.getElementById('cost-config')!;
+
+  // Config inputs
+  const inputAuto = document.getElementById('config-auto') as HTMLInputElement;
+  const inputMoto = document.getElementById('config-moto') as HTMLInputElement;
+  const inputFuel = document.getElementById('config-fuel') as HTMLInputElement;
+  const inputMotoKml = document.getElementById('config-moto-kml') as HTMLInputElement;
+  const inputAutoKml = document.getElementById('config-auto-kml') as HTMLInputElement;
+
+  // ---- Load persisted config ----
+  loadCostConfig().then((config) => {
+    $costConfig.set(config);
+    inputAuto.value = String(config.pricePerKm['driving-car']);
+    inputMoto.value = String(config.pricePerKm['cycling-electric']);
+    inputFuel.value = String(config.fuelPricePerLiter);
+    inputMotoKml.value = String(config.motoKmPerLiter);
+    inputAutoKml.value = String(config.autoKmPerLiter);
+  });
+
+  // ---- Config toggle ----
+  configToggle.addEventListener('click', () => {
+    const isOpen = configPanel.style.display !== 'none';
+    configPanel.style.display = isOpen ? 'none' : 'grid';
+    vibrateTap();
+  });
+
+  // ---- Config input handlers ----
+  function onConfigChange() {
+    const newConfig = {
+      pricePerKm: {
+        'driving-car': parseInt(inputAuto.value) || 0,
+        'cycling-electric': parseInt(inputMoto.value) || 0,
+        'cycling-regular': 0,
+        'foot-walking': 0,
+      } as Record<TransportProfile, number>,
+      fuelPricePerLiter: parseInt(inputFuel.value) || 0,
+      motoKmPerLiter: parseInt(inputMotoKml.value) || 1,
+      autoKmPerLiter: parseInt(inputAutoKml.value) || 1,
+    };
+    updateCostConfig(newConfig);
+    saveCostConfig($costConfig.get());
+    // Re-render costs
+    renderCosts();
+  }
+
+  [inputAuto, inputMoto, inputFuel, inputMotoKml, inputAutoKml].forEach((input) => {
+    input.addEventListener('change', onConfigChange);
+  });
+
+  // ---- Render costs ----
+  function renderCosts() {
+    const results = $allProfileResults.get();
+    const config = $costConfig.get();
+
+    if (results.length === 0) {
+      costResult.style.display = 'none';
+      costGrid.style.display = 'none';
+      costEmpty.style.display = 'block';
+      return;
+    }
+
+    costEmpty.style.display = 'none';
+    costGrid.style.display = 'grid';
+
+    // Calculate cost for each profile
+    const primaryResult = results.find((r) => r.profile === 'driving-car') || results[0];
+
+    results.forEach((r) => {
+      const cost = calculateTripCost(r.distance, r.profile as TransportProfile, config);
+      const valueEl = document.querySelector(`[data-cost-for="${r.profile}"]`);
+      if (valueEl) {
+        valueEl.textContent = cost.totalCup > 0 ? formatCUP(cost.totalCup) : 'Gratis';
+      }
+    });
+
+    // Show primary cost
+    if (primaryResult) {
+      const primaryCost = calculateTripCost(
+        primaryResult.distance,
+        primaryResult.profile as TransportProfile,
+        config
+      );
+      costResult.style.display = 'flex';
+      costTotal.textContent = primaryCost.totalCup > 0 ? formatCUP(primaryCost.totalCup) : 'Gratis';
+
+      if (primaryCost.fuelLiters > 0) {
+        costFuel.style.display = 'flex';
+        costFuelText.textContent = `${formatFuel(primaryCost.fuelLiters)} gasolina`;
+      } else {
+        costFuel.style.display = 'none';
+      }
+    }
+  }
+
+  $allProfileResults.subscribe(renderCosts);
+  $costConfig.subscribe(renderCosts);
+</script>
+
+<style>
+  .cost-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  /* Main cost */
+  .cost-result {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.125rem;
+    border-radius: 0.875rem;
+    background: linear-gradient(135deg, oklch(0.45 0.18 155), oklch(0.55 0.22 155));
+    color: white;
+    animation: slideUp 0.25s ease;
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .cost-main {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .cost-amount {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  .cost-label {
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    opacity: 0.75;
+  }
+
+  .cost-fuel {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    background: rgba(255,255,255,0.15);
+    border-radius: 99px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .fuel-icon {
+    font-size: 0.875rem;
+  }
+
+  /* Cost grid */
+  .cost-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+  }
+
+  @media (max-width: 400px) {
+    .cost-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  .cost-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.125rem;
+    padding: 0.625rem 0.25rem;
+    border-radius: 0.625rem;
+    background: var(--bg);
+    border: 1px solid oklch(0.5 0 0 / 0.06);
+    text-align: center;
+  }
+
+  .cost-item-icon {
+    font-size: 1.125rem;
+    line-height: 1;
+  }
+
+  .cost-item-value {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .cost-item-label {
+    font-size: 0.625rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  /* Empty */
+  .cost-empty {
+    text-align: center;
+    padding: 1.5rem;
+  }
+
+  .cost-empty-text {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    margin: 0;
+  }
+
+  /* Config toggle */
+  .cost-config-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    padding: 0.5rem;
+    border: none;
+    background: none;
+    color: var(--text-muted);
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: color 0.15s ease;
+  }
+
+  .cost-config-toggle:hover {
+    color: var(--text);
+  }
+
+  /* Config panel */
+  .cost-config {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background: var(--bg);
+    border-radius: 0.75rem;
+    border: 1px solid oklch(0.5 0 0 / 0.08);
+    animation: slideUp 0.2s ease;
+  }
+
+  @media (max-width: 380px) {
+    .cost-config {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .config-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .config-label {
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+
+  .config-input {
+    width: 100%;
+    padding: 0.5rem 0.625rem;
+    border-radius: 0.5rem;
+    border: 1px solid oklch(0.5 0 0 / 0.1);
+    background: var(--bg-elevated);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    font-weight: 600;
+    outline: none;
+    transition: border-color 0.15s ease;
+  }
+
+  .config-input:focus {
+    border-color: var(--color-brand-400);
+  }
+</style>

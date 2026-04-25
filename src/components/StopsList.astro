@@ -1,0 +1,309 @@
+---
+/**
+ * StopsList.astro — Multi-stop delivery panel
+ * Shows numbered stops, optimize button, clear all.
+ */
+import { MAX_STOPS } from '../lib/types';
+---
+
+<div id="stops-panel" class="stops-panel">
+  <!-- Empty state -->
+  <div id="stops-empty" class="stops-empty">
+    <div class="stops-empty-icon">📍</div>
+    <p class="stops-empty-text">Toca el mapa para agregar paradas</p>
+    <p class="stops-empty-hint">Hasta {MAX_STOPS} paradas · Tu GPS es el origen</p>
+  </div>
+
+  <!-- Stops list -->
+  <div id="stops-list" class="stops-list" style="display:none;"></div>
+
+  <!-- Actions bar -->
+  <div id="stops-actions" class="stops-actions" style="display:none;">
+    <button id="btn-optimize" class="stops-btn stops-btn--accent" title="Optimizar orden de paradas">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="17 1 21 5 17 9"/>
+        <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+        <polyline points="7 23 3 19 7 15"/>
+        <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+      </svg>
+      <span>Optimizar</span>
+    </button>
+    <button id="btn-clear-stops" class="stops-btn stops-btn--ghost" title="Limpiar todas las paradas">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 6 5 6 21 6"/>
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+      </svg>
+      <span>Limpiar</span>
+    </button>
+  </div>
+
+  <!-- Counter -->
+  <div id="stops-counter" class="stops-counter" style="display:none;">
+    <span id="stops-count-text"></span>
+  </div>
+</div>
+
+<script>
+  import { $stops, $userPosition, removeStop, clearRoute } from '../lib/stores';
+  import { optimizeStopOrder, calculateAllProfiles } from '../lib/routing';
+  import { vibrateTap } from '../lib/haptics';
+  import { MAX_STOPS } from '../lib/types';
+
+  const emptyEl = document.getElementById('stops-empty')!;
+  const listEl = document.getElementById('stops-list')!;
+  const actionsEl = document.getElementById('stops-actions')!;
+  const counterEl = document.getElementById('stops-counter')!;
+  const countText = document.getElementById('stops-count-text')!;
+  const btnOptimize = document.getElementById('btn-optimize')!;
+  const btnClear = document.getElementById('btn-clear-stops')!;
+
+  function renderStops() {
+    const stops = $stops.get();
+    const hasGps = !!$userPosition.get();
+
+    if (stops.length === 0) {
+      emptyEl.style.display = 'flex';
+      listEl.style.display = 'none';
+      actionsEl.style.display = 'none';
+      counterEl.style.display = 'none';
+      return;
+    }
+
+    emptyEl.style.display = 'none';
+    listEl.style.display = 'flex';
+    actionsEl.style.display = 'flex';
+    counterEl.style.display = 'flex';
+
+    countText.textContent = `${stops.length}/${MAX_STOPS} paradas`;
+
+    listEl.innerHTML = stops
+      .sort((a, b) => a.order - b.order)
+      .map((stop) => `
+        <div class="stop-card ${stop.completed ? 'stop-card--done' : ''}" data-stop-id="${stop.id}">
+          <div class="stop-number" style="background:${stop.completed ? '#22c55e' : '#ef4444'}">
+            ${stop.completed ? '✓' : stop.order + 1}
+          </div>
+          <div class="stop-info">
+            <span class="stop-label">${stop.label}</span>
+            <span class="stop-coords">${stop.position.lat.toFixed(4)}, ${stop.position.lng.toFixed(4)}</span>
+          </div>
+          <button class="stop-remove" data-remove-id="${stop.id}" aria-label="Eliminar parada" title="Eliminar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+      `)
+      .join('');
+
+    // Remove buttons
+    listEl.querySelectorAll('.stop-remove').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = (btn as HTMLElement).dataset.removeId!;
+        removeStop(id);
+        vibrateTap();
+        // Recalculate if still have stops
+        if ($stops.get().length > 0) calculateAllProfiles();
+      });
+    });
+  }
+
+  $stops.subscribe(renderStops);
+  $userPosition.subscribe(renderStops);
+  renderStops();
+
+  // Optimize
+  btnOptimize.addEventListener('click', () => {
+    vibrateTap();
+    optimizeStopOrder();
+    calculateAllProfiles();
+  });
+
+  // Clear
+  btnClear.addEventListener('click', () => {
+    vibrateTap();
+    clearRoute();
+  });
+</script>
+
+<style>
+  .stops-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  /* Empty state */
+  .stops-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 1.5rem 1rem;
+    text-align: center;
+  }
+
+  .stops-empty-icon {
+    font-size: 2rem;
+    line-height: 1;
+    opacity: 0.6;
+  }
+
+  .stops-empty-text {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--text);
+    margin: 0;
+  }
+
+  .stops-empty-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin: 0;
+  }
+
+  /* List */
+  .stops-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 16rem;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+  }
+
+  .stop-card {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 0.75rem;
+    border-radius: 0.75rem;
+    background: var(--bg);
+    border: 1px solid oklch(0.5 0 0 / 0.06);
+    transition: all 0.2s ease;
+    animation: fadeIn 0.2s ease;
+  }
+
+  .stop-card--done {
+    opacity: 0.5;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateX(-8px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .stop-number {
+    width: 1.75rem;
+    height: 1.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .stop-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.0625rem;
+  }
+
+  .stop-label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .stop-coords {
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+    font-family: monospace;
+  }
+
+  .stop-remove {
+    width: 1.75rem;
+    height: 1.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: oklch(0.5 0 0 / 0.06);
+    border-radius: 50%;
+    color: var(--text-muted);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+  }
+
+  .stop-remove:hover {
+    background: oklch(0.6 0.15 25 / 0.15);
+    color: oklch(0.55 0.2 25);
+  }
+
+  .stop-remove:active {
+    transform: scale(0.85);
+  }
+
+  /* Actions */
+  .stops-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .stops-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    padding: 0.625rem 0.75rem;
+    border-radius: 0.75rem;
+    font-family: var(--font-sans);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+  }
+
+  .stops-btn--accent {
+    background: var(--color-brand-500);
+    color: white;
+  }
+
+  .stops-btn--accent:hover {
+    filter: brightness(1.08);
+  }
+
+  .stops-btn--accent:active {
+    transform: scale(0.97);
+  }
+
+  .stops-btn--ghost {
+    background: oklch(0.5 0 0 / 0.06);
+    color: var(--text-muted);
+  }
+
+  .stops-btn--ghost:hover {
+    background: oklch(0.5 0 0 / 0.12);
+    color: var(--text);
+  }
+
+  .stops-counter {
+    display: flex;
+    justify-content: center;
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+    letter-spacing: 0.02em;
+  }
+</style>

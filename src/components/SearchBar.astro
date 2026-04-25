@@ -40,7 +40,7 @@
 </div>
 
 <script>
-  import { $searchResults, $isSearching, setDestination, setOrigin, $userPosition, $sheetState } from '../lib/stores';
+  import { $searchResults, $isSearching, $userPosition, $sheetState, addStop, $activeTab } from '../lib/stores';
   import { flyTo } from './MapClient';
   import { vibrateTap } from '../lib/haptics';
   import { calculateAllProfiles } from '../lib/routing';
@@ -133,23 +133,22 @@
       item.addEventListener('click', () => {
         const lat = parseFloat((item as HTMLElement).dataset.lat!);
         const lon = parseFloat((item as HTMLElement).dataset.lon!);
-        const name = (item as HTMLElement).dataset.name!;
+        const fullName = (item as HTMLElement).dataset.name!;
+        const shortName = fullName.split(',').slice(0, 2).join(',').trim();
 
-        const dest = { lat, lng: lon };
-        setDestination(dest);
+        const pos = { lat, lng: lon };
         flyTo(lat, lon, 15);
 
-        const userPos = $userPosition.get();
-        if (userPos) {
-          const origin = { lat: userPos.lat, lng: userPos.lng };
-          setOrigin(origin);
-          calculateAllProfiles(origin, dest);
+        const stop = addStop(pos, shortName);
+        if (stop) {
+          calculateAllProfiles();
         }
 
         $sheetState.set('half');
-        input.value = name.split(',').slice(0, 2).join(',');
+        $activeTab.set('route');
+        input.value = '';
         resultsContainer.style.display = 'none';
-        clearBtn.style.display = 'flex';
+        clearBtn.style.display = 'none';
         input.blur(); // dismiss keyboard
         vibrateTap();
       });

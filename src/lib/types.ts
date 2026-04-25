@@ -12,14 +12,16 @@ export interface TransportOption {
   icon: string;
   /** Display label for UI */
   displayName: string;
+  /** Default price per km in CUP */
+  defaultPricePerKm: number;
 }
 
 /** All available transport options */
 export const TRANSPORT_OPTIONS: TransportOption[] = [
-  { id: 'driving-car', label: 'auto', icon: '🚗', displayName: 'Auto' },
-  { id: 'cycling-electric', label: 'moto', icon: '🏍️', displayName: 'Moto' },
-  { id: 'cycling-regular', label: 'bici', icon: '🚲', displayName: 'Bici' },
-  { id: 'foot-walking', label: 'pie', icon: '🚶', displayName: 'Pie' },
+  { id: 'driving-car', label: 'auto', icon: '🚗', displayName: 'Auto', defaultPricePerKm: 25 },
+  { id: 'cycling-electric', label: 'moto', icon: '🏍️', displayName: 'Moto', defaultPricePerKm: 15 },
+  { id: 'cycling-regular', label: 'bici', icon: '🚲', displayName: 'Bici', defaultPricePerKm: 0 },
+  { id: 'foot-walking', label: 'pie', icon: '🚶', displayName: 'Pie', defaultPricePerKm: 0 },
 ];
 
 /** Geographic coordinate */
@@ -75,28 +77,71 @@ export interface RouteInstruction {
   type: number;
 }
 
-/** Province data for GeoJSON layer */
-export interface ProvinceProperties {
+// ============================================
+// DELIVERY / MESSENGER TYPES
+// ============================================
+
+/** Single delivery stop in a multi-stop route */
+export interface DeliveryStop {
+  id: string;
+  position: LatLng;
+  label: string;
+  order: number;
+  completed: boolean;
+}
+
+/** Cost configuration per transport (user-editable, persisted) */
+export interface CostConfig {
+  /** Price per km for each profile (CUP) */
+  pricePerKm: Record<TransportProfile, number>;
+  /** Fuel price per liter in CUP (for moto/auto) */
+  fuelPricePerLiter: number;
+  /** Fuel consumption in km per liter (for moto) */
+  motoKmPerLiter: number;
+  /** Fuel consumption in km per liter (for auto) */
+  autoKmPerLiter: number;
+}
+
+/** Default cost configuration */
+export const DEFAULT_COST_CONFIG: CostConfig = {
+  pricePerKm: {
+    'driving-car': 25,
+    'cycling-electric': 15,
+    'cycling-regular': 0,
+    'foot-walking': 0,
+  },
+  fuelPricePerLiter: 132,
+  motoKmPerLiter: 35,
+  autoKmPerLiter: 12,
+};
+
+/** Calculated trip cost */
+export interface TripCost {
+  /** Total cost in CUP */
+  totalCup: number;
+  /** Fuel used in liters */
+  fuelLiters: number;
+  /** Fuel cost portion in CUP */
+  fuelCostCup: number;
+  /** Price per km used */
+  pricePerKm: number;
+}
+
+/** Saved favorite route */
+export interface FavoriteRoute {
+  id: string;
   name: string;
-  code: string;
-  active: boolean;
+  stops: DeliveryStop[];
+  totalDistance: number;
+  totalDuration: number;
+  estimatedCost: number;
+  profile: TransportProfile;
+  createdAt: number;
 }
 
-/** App theme mode */
-export type ThemeMode = 'day' | 'night';
-
-/** Bottom sheet states */
-export type SheetState = 'collapsed' | 'half' | 'expanded';
-
-/** Geocoding result from Nominatim */
-export interface GeocodingResult {
-  place_id: number;
-  display_name: string;
-  lat: string;
-  lon: string;
-  type: string;
-  importance: number;
-}
+// ============================================
+// GEOGRAPHY CONSTANTS
+// ============================================
 
 /** Cuba geographic bounds for constraining the map */
 export const CUBA_BOUNDS = {
@@ -118,6 +163,13 @@ export const DEFAULT_ZOOM = 7;
 /** Zoom level when focusing on an active province */
 export const PROVINCE_ZOOM = 11;
 
+/** Max number of delivery stops */
+export const MAX_STOPS = 8;
+
+// ============================================
+// MAP TILES
+// ============================================
+
 /** Stadia Maps tile URLs */
 export const TILE_URLS = {
   day: 'https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png',
@@ -127,3 +179,26 @@ export const TILE_URLS = {
 /** Stadia Maps attribution */
 export const TILE_ATTRIBUTION =
   '&copy; <a href="https://stadiamaps.com/" target="_blank">Stadia Maps</a> &copy; <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OSM</a>';
+
+// ============================================
+// UI TYPES
+// ============================================
+
+/** App theme mode */
+export type ThemeMode = 'day' | 'night';
+
+/** Bottom sheet states */
+export type SheetState = 'collapsed' | 'half' | 'expanded';
+
+/** Bottom sheet tabs */
+export type SheetTab = 'route' | 'cost' | 'favorites';
+
+/** Geocoding result from Nominatim */
+export interface GeocodingResult {
+  place_id: number;
+  display_name: string;
+  lat: string;
+  lon: string;
+  type: string;
+  importance: number;
+}

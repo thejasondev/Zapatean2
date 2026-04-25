@@ -10,10 +10,14 @@ import type {
   RouteResult,
   ThemeMode,
   SheetState,
+  SheetTab,
   LatLng,
   GeocodingResult,
+  DeliveryStop,
+  CostConfig,
+  FavoriteRoute,
 } from './types';
-import { CUBA_CENTER, DEFAULT_ZOOM } from './types';
+import { CUBA_CENTER, DEFAULT_ZOOM, DEFAULT_COST_CONFIG, MAX_STOPS } from './types';
 
 // ---- User Position (GPS) ----
 export const $userPosition = atom<UserPosition | null>(null);
@@ -63,6 +67,7 @@ if (typeof window !== 'undefined') {
 
 // ---- Bottom Sheet State ----
 export const $sheetState = atom<SheetState>('collapsed');
+export const $activeTab = atom<SheetTab>('route');
 
 // ---- GPS Watch ID ----
 export const $gpsWatchId = atom<number | null>(null);
@@ -78,25 +83,107 @@ export const $isSearching = atom<boolean>(false);
 // ---- Error state ----
 export const $error = atom<string | null>(null);
 
-// ---- Helper: set origin ----
+// ============================================
+// DELIVERY STOPS (Multi-Stop / Messenger Mode)
+// ============================================
+
+export const $stops = atom<DeliveryStop[]>([]);
+
+let stopCounter = 0;
+
+/** Generate a simple unique ID */
+function generateId(): string {
+  return `stop_${Date.now()}_${++stopCounter}`;
+}
+
+/** Add a new delivery stop */
+export function addStop(position: LatLng, label?: string): DeliveryStop | null {
+  const current = $stops.get();
+  if (current.length >= MAX_STOPS) return null;
+
+  const stop: DeliveryStop = {
+    id: generateId(),
+    position,
+    label: label || `Parada ${current.length + 1}`,
+    order: current.length,
+    completed: false,
+  };
+
+  $stops.set([...current, stop]);
+  return stop;
+}
+
+/** Remove a delivery stop by ID */
+export function removeStop(id: string): void {
+  const filtered = $stops.get().filter((s) => s.id !== id);
+  // Reorder
+  const reordered = filtered.map((s, i) => ({
+    ...s,
+    order: i,
+    label: s.label.startsWith('Parada') ? `Parada ${i + 1}` : s.label,
+  }));
+  $stops.set(reordered);
+}
+
+/** Reorder stops (after optimization or manual drag) */
+export function reorderStops(newOrder: DeliveryStop[]): void {
+  $stops.set(newOrder.map((s, i) => ({ ...s, order: i })));
+}
+
+/** Clear all stops */
+export function clearStops(): void {
+  $stops.set([]);
+  stopCounter = 0;
+}
+
+/** Toggle stop completed state */
+export function toggleStopCompleted(id: string): void {
+  $stops.set(
+    $stops.get().map((s) => (s.id === id ? { ...s, completed: !s.completed } : s))
+  );
+}
+
+// ============================================
+// COST CONFIGURATION
+// ============================================
+
+export const $costConfig = atom<CostConfig>(DEFAULT_COST_CONFIG);
+
+/** Update cost config and persist */
+export function updateCostConfig(patch: Partial<CostConfig>): void {
+  const current = $costConfig.get();
+  $costConfig.set({ ...current, ...patch });
+}
+
+// ============================================
+// FAVORITES
+// ============================================
+
+export const $favorites = atom<FavoriteRoute[]>([]);
+
+// ============================================
+// HELPERS
+// ============================================
+
+/** Set origin */
 export function setOrigin(point: LatLng) {
   const params = $routeParams.get();
   $routeParams.set({ ...params, origin: point });
 }
 
-// ---- Helper: set destination ----
+/** Set destination */
 export function setDestination(point: LatLng) {
   const params = $routeParams.get();
   $routeParams.set({ ...params, destination: point });
 }
 
-// ---- Helper: set transport profile ----
+/** Set transport profile */
 export function setProfile(profile: RouteParams['profile']) {
   const params = $routeParams.get();
   $routeParams.set({ ...params, profile });
 }
 
-// ---- Helper: clear route ----
+/** Clear route and stops */
 export function clearRoute() {
   $currentRoute.set(null);
   $allProfileResults.set([]);
@@ -105,10 +192,11 @@ export function clearRoute() {
     origin: null,
     destination: null,
   });
+  clearStops();
   $error.set(null);
 }
 
-// ---- Helper: toggle theme ----
+/** Toggle theme */
 export function toggleTheme() {
   $theme.set($theme.get() === 'day' ? 'night' : 'day');
 }
