@@ -1,0 +1,97 @@
+---
+/**
+ * BaseLayout.astro — Main PWA layout wrapper
+ * Handles: meta tags, fonts, PWA meta, theme initialization, global CSS, SEO
+ */
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = 'Zapatean2 — Rutas Cuba',
+  description = 'PWA de navegación y rutas para Cuba. Calcula tiempos de viaje en Auto, Moto, Bici y a Pie. Funciona offline.',
+} = Astro.props;
+
+const canonicalURL = new URL(Astro.url.pathname, Astro.site);
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+
+    <!-- SEO Core -->
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonicalURL} />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="robots" content="index, follow" />
+
+    <!-- Open Graph / Social -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonicalURL} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={new URL('/icons/icon-512x512.png', Astro.site)} />
+    <meta property="og:locale" content="es_CU" />
+    <meta property="og:site_name" content="Zapatean2" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={new URL('/icons/icon-512x512.png', Astro.site)} />
+
+    <!-- Geo targeting for Cuba -->
+    <meta name="geo.region" content="CU" />
+    <meta name="geo.placename" content="Cuba" />
+
+    <!-- PWA Meta -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Zapatean" />
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/favicon.png" />
+
+    <!-- Fonts: Inter (with font-display swap for performance) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+    <!-- Preconnect to tile server -->
+    <link rel="preconnect" href="https://tiles.stadiamaps.com" />
+    <link rel="dns-prefetch" href="https://nominatim.openstreetmap.org" />
+
+    <!-- Theme initialization (prevent FOUC) -->
+    <script is:inline>
+      (function() {
+        const theme = localStorage.getItem('zapatean-theme') || 'day';
+        document.documentElement.setAttribute('data-theme', theme);
+      })();
+    </script>
+
+    <!-- Service Worker Registration -->
+    <script is:inline>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js', { scope: '/' })
+            .then((reg) => {
+              // Auto-update check every 60 minutes
+              setInterval(() => reg.update(), 60 * 60 * 1000);
+            })
+            .catch((err) => console.warn('[Zapatean2] SW registration failed:', err));
+        });
+      }
+    </script>
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

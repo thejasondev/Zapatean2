@@ -1,0 +1,8 @@
+# Zapatean2 — Robots.txt
+# https://zapatean2.vercel.app
+
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://zapatean2.vercel.app/sitemap.xml

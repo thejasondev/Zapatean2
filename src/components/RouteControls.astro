@@ -1,0 +1,449 @@
+---
+/**
+ * RouteControls.astro — Route results with all transport profile times
+ * Lives inside the BottomSheet component.
+ * Shows a comparison grid of all transport options with distance and time.
+ */
+import { TRANSPORT_OPTIONS } from '../lib/types';
+---
+
+<div id="route-controls" class="route-controls">
+  <!-- Route Destination Info -->
+  <div id="route-header" class="route-header" style="display:none;">
+    <div class="route-header-title">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+        <circle cx="12" cy="10" r="3"/>
+      </svg>
+      <span id="route-dest-label">Destino seleccionado</span>
+    </div>
+    <button id="btn-clear-route" class="btn-clear-route" aria-label="Limpiar ruta" title="Cancelar ruta">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18"/>
+        <line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Loading State -->
+  <div id="route-loading" class="route-loading" style="display:none;">
+    <div class="loading-shimmer"></div>
+    <div class="loading-shimmer loading-shimmer--short"></div>
+    <div class="loading-shimmer loading-shimmer--short"></div>
+    <div class="loading-shimmer loading-shimmer--short"></div>
+  </div>
+
+  <!-- Transport Options Grid (shows all with times) -->
+  <div id="transport-grid" class="transport-grid" style="display:none;">
+    {TRANSPORT_OPTIONS.map((opt) => (
+      <button
+        class="transport-card"
+        data-profile={opt.id}
+        data-active="false"
+      >
+        <span class="transport-card-icon">{opt.icon}</span>
+        <span class="transport-card-name">{opt.displayName}</span>
+        <span class="transport-card-time" data-time-for={opt.id}>—</span>
+        <span class="transport-card-dist" data-dist-for={opt.id}></span>
+      </button>
+    ))}
+  </div>
+
+  <!-- Primary Route Detail Card -->
+  <div id="route-detail" class="route-detail" style="display:none;">
+    <div class="detail-row">
+      <div class="detail-stat">
+        <span class="detail-icon">📏</span>
+        <div>
+          <span class="detail-value" id="detail-distance">—</span>
+          <span class="detail-label">distancia</span>
+        </div>
+      </div>
+      <div class="detail-divider"></div>
+      <div class="detail-stat">
+        <span class="detail-icon">⏱️</span>
+        <div>
+          <span class="detail-value" id="detail-duration">—</span>
+          <span class="detail-label">tiempo est.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- No GPS Warning -->
+  <div id="no-gps-warning" class="no-gps-warning" style="display:none;">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+      <circle cx="12" cy="12" r="10"/>
+      <line x1="12" y1="8" x2="12" y2="12"/>
+      <line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+    <span>Activa tu ubicación (botón GPS) para calcular rutas automáticamente al tocar el mapa</span>
+  </div>
+
+  <!-- Error message -->
+  <div id="route-error" class="route-error" style="display:none;">
+    <span>⚠️</span>
+    <span id="route-error-text"></span>
+  </div>
+</div>
+
+<script>
+  import { $currentRoute, $isRouteLoading, $error, $userPosition, $allProfileResults, clearRoute } from '../lib/stores';
+  import { TRANSPORT_OPTIONS } from '../lib/types';
+  import { formatDistance, formatDuration } from '../lib/routing';
+  import { vibrateTap } from '../lib/haptics';
+
+  // ---- Elements ----
+  const routeHeader = document.getElementById('route-header')!;
+  const routeLoading = document.getElementById('route-loading')!;
+  const transportGrid = document.getElementById('transport-grid')!;
+  const routeDetail = document.getElementById('route-detail')!;
+  const detailDistance = document.getElementById('detail-distance')!;
+  const detailDuration = document.getElementById('detail-duration')!;
+  const btnClear = document.getElementById('btn-clear-route')!;
+  const routeError = document.getElementById('route-error')!;
+  const routeErrorText = document.getElementById('route-error-text')!;
+  const noGpsWarning = document.getElementById('no-gps-warning')!;
+  const destLabel = document.getElementById('route-dest-label')!;
+  const cards = document.querySelectorAll('.transport-card');
+
+  // ---- Subscribe: Loading state ----
+  $isRouteLoading.subscribe((loading) => {
+    routeLoading.style.display = loading ? 'flex' : 'none';
+    if (loading) {
+      routeHeader.style.display = 'flex';
+      destLabel.textContent = 'Calculando rutas...';
+      transportGrid.style.display = 'none';
+      routeDetail.style.display = 'none';
+    }
+  });
+
+  // ---- Subscribe: All profile results ----
+  $allProfileResults.subscribe((results) => {
+    if (results.length === 0) {
+      transportGrid.style.display = 'none';
+      routeDetail.style.display = 'none';
+      return;
+    }
+
+    routeLoading.style.display = 'none';
+    routeHeader.style.display = 'flex';
+    destLabel.textContent = 'Ruta calculada';
+    transportGrid.style.display = 'grid';
+    noGpsWarning.style.display = 'none';
+
+    // Populate times for each transport
+    results.forEach((result) => {
+      const timeEl = document.querySelector(`[data-time-for="${result.profile}"]`);
+      const distEl = document.querySelector(`[data-dist-for="${result.profile}"]`);
+      if (timeEl) timeEl.textContent = formatDuration(result.duration);
+      if (distEl) distEl.textContent = formatDistance(result.distance);
+    });
+
+    // Highlight the first card (driving-car) by default
+    cards.forEach((card) => {
+      const profile = (card as HTMLElement).dataset.profile;
+      (card as HTMLElement).dataset.active = profile === 'driving-car' ? 'true' : 'false';
+    });
+
+    // Show detail for driving-car
+    const primaryResult = results.find((r) => r.profile === 'driving-car');
+    if (primaryResult) {
+      detailDistance.textContent = formatDistance(primaryResult.distance);
+      detailDuration.textContent = formatDuration(primaryResult.duration);
+      routeDetail.style.display = 'block';
+    }
+  });
+
+  // ---- Transport card click: show that profile's details ----
+  cards.forEach((card) => {
+    card.addEventListener('click', () => {
+      const profile = (card as HTMLElement).dataset.profile!;
+      vibrateTap();
+
+      // Update active card
+      cards.forEach((c) => (c as HTMLElement).dataset.active = 'false');
+      (card as HTMLElement).dataset.active = 'true';
+
+      // Update detail card
+      const results = $allProfileResults.get();
+      const result = results.find((r) => r.profile === profile);
+      if (result) {
+        detailDistance.textContent = formatDistance(result.distance);
+        detailDuration.textContent = formatDuration(result.duration);
+        routeDetail.style.display = 'block';
+      }
+    });
+  });
+
+  // ---- Subscribe: Error state ----
+  $error.subscribe((error) => {
+    if (error) {
+      routeErrorText.textContent = error;
+      routeError.style.display = 'flex';
+      routeLoading.style.display = 'none';
+    } else {
+      routeError.style.display = 'none';
+    }
+  });
+
+  // ---- Subscribe: User position - show/hide GPS warning ----
+  $userPosition.subscribe((pos) => {
+    const hasRoute = $currentRoute.get();
+    if (!pos && !hasRoute) {
+      noGpsWarning.style.display = 'flex';
+    } else {
+      noGpsWarning.style.display = 'none';
+    }
+  });
+
+  // Show GPS warning initially if no GPS
+  if (!$userPosition.get() && !$currentRoute.get()) {
+    noGpsWarning.style.display = 'flex';
+  }
+
+  // ---- Clear Route ----
+  btnClear.addEventListener('click', () => {
+    clearRoute();
+    routeHeader.style.display = 'none';
+    transportGrid.style.display = 'none';
+    routeDetail.style.display = 'none';
+    // Reset all time labels
+    document.querySelectorAll('[data-time-for]').forEach((el) => el.textContent = '—');
+    document.querySelectorAll('[data-dist-for]').forEach((el) => el.textContent = '');
+    vibrateTap();
+  });
+</script>
+
+<style>
+  .route-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+  }
+
+  /* Route Header */
+  .route-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .route-header-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .route-header-title svg {
+    color: var(--color-accent-500);
+  }
+
+  .btn-clear-route {
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: oklch(0.5 0 0 / 0.08);
+    border: none;
+    border-radius: 50%;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .btn-clear-route:hover {
+    background: oklch(0.5 0 0 / 0.15);
+    color: var(--text);
+  }
+
+  /* Loading Shimmer */
+  .route-loading {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .loading-shimmer {
+    height: 3.5rem;
+    border-radius: var(--radius-button);
+    background: linear-gradient(
+      90deg,
+      oklch(0.5 0 0 / 0.04) 25%,
+      oklch(0.5 0 0 / 0.1) 50%,
+      oklch(0.5 0 0 / 0.04) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  .loading-shimmer--short {
+    height: 2.5rem;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  /* Transport Options Grid */
+  .transport-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+  }
+
+  .transport-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.75rem 0.375rem;
+    border-radius: var(--radius-button);
+    border: 1.5px solid oklch(0.5 0 0 / 0.1);
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+  }
+
+  .transport-card:hover {
+    border-color: var(--color-brand-400);
+    background: oklch(0.55 0.20 250 / 0.05);
+  }
+
+  .transport-card[data-active="true"] {
+    border-color: var(--color-brand-500);
+    background: oklch(0.55 0.20 250 / 0.1);
+    box-shadow: 0 2px 8px oklch(0.55 0.20 250 / 0.15);
+  }
+
+  .transport-card-icon {
+    font-size: 1.5rem;
+    line-height: 1;
+  }
+
+  .transport-card-name {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+  }
+
+  .transport-card[data-active="true"] .transport-card-name {
+    color: var(--color-brand-500);
+  }
+
+  .transport-card-time {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+
+  .transport-card[data-active="true"] .transport-card-time {
+    color: var(--color-brand-500);
+  }
+
+  .transport-card-dist {
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+    opacity: 0.7;
+  }
+
+  /* Route Detail Card */
+  .route-detail {
+    animation: slideUp 0.25s ease;
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .detail-row {
+    display: flex;
+    align-items: center;
+    padding: 0.875rem 1rem;
+    border-radius: var(--radius-button);
+    background: var(--color-brand-500);
+    color: white;
+    gap: 1rem;
+  }
+
+  .detail-stat {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    flex: 1;
+  }
+
+  .detail-icon {
+    font-size: 1.5rem;
+    line-height: 1;
+  }
+
+  .detail-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    display: block;
+    letter-spacing: -0.02em;
+  }
+
+  .detail-label {
+    font-size: 0.625rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    opacity: 0.7;
+    display: block;
+  }
+
+  .detail-divider {
+    width: 1px;
+    height: 2.5rem;
+    background: rgba(255,255,255,0.2);
+  }
+
+  /* No GPS Warning */
+  .no-gps-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-button);
+    background: oklch(0.55 0.20 250 / 0.08);
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+    line-height: 1.45;
+  }
+
+  .no-gps-warning svg {
+    color: var(--color-brand-400);
+    margin-top: 0.0625rem;
+  }
+
+  /* Error */
+  .route-error {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-button);
+    background: oklch(0.95 0.05 25);
+    color: oklch(0.35 0.15 25);
+    font-size: 0.8125rem;
+    animation: slideUp 0.25s ease;
+  }
+
+  :root[data-theme="night"] .route-error {
+    background: oklch(0.2 0.05 25);
+    color: oklch(0.85 0.12 25);
+  }
+</style>

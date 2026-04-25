@@ -1,0 +1,73 @@
+---
+/**
+ * GpsButton.astro — Floating button to center map on user location
+ * Part of the right-side action rail (stacked with theme toggle)
+ */
+---
+
+<button
+  id="gps-button"
+  class="fab-button gps-button"
+  aria-label="Mi ubicación"
+  title="Centrar en mi ubicación"
+>
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="4" />
+    <line x1="12" y1="2" x2="12" y2="6" />
+    <line x1="12" y1="18" x2="12" y2="22" />
+    <line x1="2" y1="12" x2="6" y2="12" />
+    <line x1="18" y1="12" x2="22" y2="12" />
+  </svg>
+</button>
+
+<script>
+  import { startWatching, getOneTimePosition } from '../lib/geolocation';
+  import { centerOnUser } from '../components/MapClient';
+  import { $userPosition } from '../lib/stores';
+  import { vibrateTap } from '../lib/haptics';
+
+  const btn = document.getElementById('gps-button');
+  let hasStartedWatch = false;
+
+  btn?.addEventListener('click', async () => {
+    vibrateTap();
+
+    if (!hasStartedWatch) {
+      startWatching();
+      hasStartedWatch = true;
+
+      try {
+        await getOneTimePosition();
+        centerOnUser();
+      } catch (e) {
+        console.warn('[Zapatean2] GPS permission denied or unavailable');
+      }
+    } else {
+      centerOnUser();
+    }
+  });
+
+  // Update button style when GPS is active
+  $userPosition.subscribe((pos) => {
+    if (pos && btn) {
+      btn.classList.add('gps-active');
+    }
+  });
+</script>
+
+<style>
+  .gps-button svg {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  .gps-button.gps-active {
+    color: var(--color-brand-500);
+    border-color: oklch(0.55 0.20 250 / 0.2);
+  }
+
+  .gps-button.gps-active svg circle {
+    fill: var(--color-brand-500);
+    fill-opacity: 0.15;
+  }
+</style>

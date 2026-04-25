@@ -1,0 +1,133 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "name": "Pinar del Río", "code": "PR", "active": false },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-84.95,22.05],[-84.85,22.80],[-83.80,22.75],[-83.40,22.60],[-83.20,22.40],[-83.40,22.10],[-84.00,21.90],[-84.95,22.05]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Artemisa", "code": "AR", "active": false },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-83.20,22.40],[-83.40,22.80],[-82.90,22.85],[-82.60,22.70],[-82.60,22.45],[-82.80,22.30],[-83.20,22.40]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "La Habana", "code": "LH", "active": true },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-82.60,22.95],[-82.55,23.20],[-82.25,23.20],[-82.20,23.10],[-82.25,22.95],[-82.35,22.90],[-82.60,22.95]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Mayabeque", "code": "MY", "active": false },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-82.25,22.95],[-82.20,22.60],[-81.80,22.55],[-81.55,22.70],[-81.60,22.95],[-82.25,22.95]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Matanzas", "code": "MT", "active": true },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-81.55,22.70],[-81.80,23.20],[-81.00,23.25],[-80.60,23.10],[-80.50,22.70],[-80.70,22.30],[-81.20,22.20],[-81.55,22.40],[-81.55,22.70]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Cienfuegos", "code": "CF", "active": false },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-80.70,22.30],[-80.50,22.15],[-80.20,22.00],[-80.00,22.10],[-80.10,22.35],[-80.50,22.50],[-80.70,22.30]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Villa Clara", "code": "VC", "active": false },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-80.50,22.50],[-80.50,22.70],[-80.10,22.80],[-79.70,22.95],[-79.50,22.55],[-79.70,22.30],[-80.10,22.35],[-80.50,22.50]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Sancti Spíritus", "code": "SS", "active": false },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-79.70,22.30],[-79.50,22.55],[-79.70,22.95],[-79.30,22.90],[-79.00,22.50],[-79.20,22.10],[-79.70,22.30]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Ciego de Ávila", "code": "CA", "active": false },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-79.00,22.50],[-79.30,22.90],[-78.80,22.80],[-78.50,22.50],[-78.60,22.20],[-79.00,22.10],[-79.00,22.50]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Camagüey", "code": "CM", "active": false },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-78.50,22.50],[-78.80,22.80],[-78.10,22.70],[-77.60,22.40],[-77.70,22.00],[-78.20,21.80],[-78.60,22.00],[-78.50,22.50]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Las Tunas", "code": "LT", "active": false },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-77.60,22.40],[-77.00,22.20],[-76.60,21.90],[-76.80,21.60],[-77.30,21.70],[-77.70,22.00],[-77.60,22.40]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Holguín", "code": "HO", "active": false },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-77.00,22.20],[-76.40,21.30],[-75.70,21.10],[-75.60,20.70],[-76.10,20.60],[-76.60,20.80],[-76.60,21.90],[-77.00,22.20]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Granma", "code": "GR", "active": false },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-77.30,21.70],[-76.80,21.60],[-76.60,20.80],[-76.80,19.90],[-77.40,19.85],[-77.70,20.10],[-77.60,21.00],[-77.30,21.70]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Santiago de Cuba", "code": "SC", "active": false },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-76.60,20.80],[-76.10,20.60],[-75.60,20.20],[-75.80,19.85],[-76.30,19.80],[-76.80,19.90],[-76.60,20.80]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Guantánamo", "code": "GU", "active": false },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-75.60,20.70],[-75.20,20.60],[-74.15,20.25],[-74.20,20.00],[-74.80,19.90],[-75.30,19.85],[-75.60,20.20],[-75.60,20.70]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Isla de la Juventud", "code": "IJ", "active": false },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-83.20,21.90],[-83.00,21.95],[-82.60,21.90],[-82.50,21.70],[-82.55,21.50],[-82.80,21.40],[-83.10,21.50],[-83.25,21.70],[-83.20,21.90]]]
+      }
+    }
+  ]
+}

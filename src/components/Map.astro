@@ -1,0 +1,103 @@
+---
+/**
+ * Map.astro — Fullscreen map container (Leaflet Island)
+ * The map logic lives in MapClient.ts and hydrates only on the client.
+ */
+---
+
+<div id="map-container" class="map-wrapper">
+  <!-- Map will be initialized here -->
+  <div id="map" aria-label="Mapa interactivo de Cuba"></div>
+
+  <!-- Loading state -->
+  <div id="map-loading" class="map-loading">
+    <div class="map-loading-spinner"></div>
+    <p>Cargando mapa...</p>
+  </div>
+</div>
+
+<script>
+  import { initMap } from './MapClient';
+
+  // Initialize map when DOM is ready
+  document.addEventListener('DOMContentLoaded', () => {
+    const mapEl = document.getElementById('map');
+    const loadingEl = document.getElementById('map-loading');
+
+    if (mapEl) {
+      const map = initMap(mapEl);
+
+      // Hide loading once first tile loads
+      map.whenReady(() => {
+        if (loadingEl) {
+          loadingEl.style.opacity = '0';
+          setTimeout(() => {
+            loadingEl.style.display = 'none';
+          }, 400);
+        }
+      });
+    }
+  });
+</script>
+
+<style>
+  .map-wrapper {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+  }
+
+  #map {
+    width: 100%;
+    height: 100%;
+  }
+
+  .map-loading {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    background: var(--bg);
+    transition: opacity 0.4s ease;
+  }
+
+  .map-loading p {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  .map-loading-spinner {
+    width: 2.5rem;
+    height: 2.5rem;
+    border: 3px solid var(--text-muted);
+    border-top-color: var(--color-brand-500, #3b82f6);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* Province tooltip styling */
+  :global(.province-tooltip) {
+    background: var(--bg-elevated) !important;
+    color: var(--text) !important;
+    border: 1px solid var(--color-brand-400, #60a5fa) !important;
+    border-radius: 0.5rem !important;
+    padding: 0.375rem 0.75rem !important;
+    font-family: var(--font-sans) !important;
+    font-size: 0.8125rem !important;
+    font-weight: 600 !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+  }
+
+  :global(.province-tooltip::before) {
+    border-top-color: var(--bg-elevated) !important;
+  }
+</style>

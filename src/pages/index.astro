@@ -1,0 +1,40 @@
+---
+/**
+ * index.astro — Main app page: fullscreen map with controls
+ */
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Map from '../components/Map.astro';
+import SearchBar from '../components/SearchBar.astro';
+import ThemeToggle from '../components/ThemeToggle.astro';
+import GpsButton from '../components/GpsButton.astro';
+import BottomSheet from '../components/BottomSheet.astro';
+---
+
+<BaseLayout>
+  <!-- Fullscreen Map -->
+  <Map />
+
+  <!-- Search Bar (top, full width) -->
+  <SearchBar />
+
+  <!-- Right Action Rail: grouped FABs -->
+  <div class="action-rail" id="action-rail">
+    <ThemeToggle />
+    <GpsButton />
+  </div>
+
+  <!-- Bottom Navigation Sheet -->
+  <BottomSheet />
+</BaseLayout>
+
+<style>
+  .action-rail {
+    position: fixed;
+    right: 0.75rem;
+    bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+    z-index: 950;
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+  }
+</style>

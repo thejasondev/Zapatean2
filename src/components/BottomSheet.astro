@@ -1,0 +1,135 @@
+---
+/**
+ * BottomSheet.astro — Draggable bottom panel for navigation controls
+ * States: collapsed (mini handle), half (controls visible), expanded (full info)
+ */
+import RouteControls from './RouteControls.astro';
+---
+
+<div id="bottom-sheet" class="sheet" data-state="collapsed">
+  <!-- Drag Handle -->
+  <div id="sheet-handle" class="sheet-handle" role="button" aria-label="Arrastrar panel"></div>
+
+  <!-- Sheet Content -->
+  <div id="sheet-content" class="sheet-content">
+    <RouteControls />
+  </div>
+</div>
+
+<script>
+  import { $sheetState } from '../lib/stores';
+
+  const sheet = document.getElementById('bottom-sheet');
+  const handle = document.getElementById('sheet-handle');
+
+  if (!sheet || !handle) throw new Error('Bottom sheet elements not found');
+
+  // Sheet position constants (as translateY values)
+  const STATES = {
+    collapsed: 'calc(100% - 2.5rem)',  // Only handle visible
+    half: '50%',                        // Half screen
+    expanded: '2rem',                   // Almost full screen
+  };
+
+  type SheetStateKey = keyof typeof STATES;
+
+  // Set initial state
+  function applyState(state: SheetStateKey) {
+    sheet!.style.transform = `translateY(${STATES[state]})`;
+    sheet!.setAttribute('data-state', state);
+  }
+
+  applyState('collapsed');
+
+  // Touch gesture handling
+  let startY = 0;
+  let currentY = 0;
+  let startTransform = 0;
+  let isDragging = false;
+
+  function getTranslateY(): number {
+    const style = getComputedStyle(sheet!);
+    const matrix = new DOMMatrix(style.transform);
+    return matrix.m42;
+  }
+
+  handle.addEventListener('touchstart', (e) => {
+    isDragging = true;
+    startY = e.touches[0].clientY;
+    startTransform = getTranslateY();
+    sheet!.style.transition = 'none';
+  }, { passive: true });
+
+  document.addEventListener('touchmove', (e) => {
+    if (!isDragging) return;
+    currentY = e.touches[0].clientY;
+    const diff = currentY - startY;
+    const newY = Math.max(20, startTransform + diff); // Min 20px from top
+    sheet!.style.transform = `translateY(${newY}px)`;
+  }, { passive: true });
+
+  document.addEventListener('touchend', () => {
+    if (!isDragging) return;
+    isDragging = false;
+    sheet!.style.transition = '';
+
+    const currentTranslate = getTranslateY();
+    const windowHeight = window.innerHeight;
+    const percentage = currentTranslate / windowHeight;
+
+    // Snap to closest state
+    let newState: SheetStateKey;
+    if (percentage < 0.3) {
+      newState = 'expanded';
+    } else if (percentage < 0.65) {
+      newState = 'half';
+    } else {
+      newState = 'collapsed';
+    }
+
+    applyState(newState);
+    $sheetState.set(newState);
+  });
+
+  // Click on handle toggles between collapsed ↔ half
+  handle.addEventListener('click', () => {
+    const current = sheet!.getAttribute('data-state') as SheetStateKey;
+    const next: SheetStateKey = current === 'collapsed' ? 'half' : 'collapsed';
+    applyState(next);
+    $sheetState.set(next);
+  });
+
+  // Subscribe to external state changes
+  $sheetState.subscribe((state) => {
+    applyState(state as SheetStateKey);
+  });
+</script>
+
+<style>
+  .sheet {
+    height: calc(100dvh - 1rem);
+    overflow: hidden;
+  }
+
+  .sheet[data-state="half"],
+  .sheet[data-state="expanded"] {
+    overflow-y: auto;
+  }
+
+  .sheet-content {
+    padding: 0 1.25rem 1.5rem;
+  }
+
+  /* Smooth reveal of content */
+  .sheet[data-state="collapsed"] .sheet-content {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .sheet[data-state="half"] .sheet-content,
+  .sheet[data-state="expanded"] .sheet-content {
+    opacity: 1;
+    pointer-events: auto;
+    transition: opacity 0.3s ease 0.1s;
+  }
+</style>
