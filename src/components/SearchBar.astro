@@ -43,7 +43,7 @@
   import { $searchResults, $isSearching, $userPosition, $sheetState, addStop, $activeTab } from '../lib/stores';
   import { flyTo } from './MapClient';
   import { vibrateTap } from '../lib/haptics';
-  import { calculateAllProfiles } from '../lib/routing';
+  import { calculateAllProfilesDebounced } from '../lib/routing';
   import type { GeocodingResult } from '../lib/types';
 
   const input = document.getElementById('search-address') as HTMLInputElement;
@@ -141,7 +141,7 @@
 
         const stop = addStop(pos, shortName);
         if (stop) {
-          calculateAllProfiles();
+          calculateAllProfilesDebounced();
         }
 
         $sheetState.set('half');

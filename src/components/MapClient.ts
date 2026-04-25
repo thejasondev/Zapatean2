@@ -24,7 +24,7 @@ import {
   addStop,
 } from '../lib/stores';
 import { vibrateTap, vibrateConfirm } from '../lib/haptics';
-import { calculateAllProfiles } from '../lib/routing';
+import { calculateAllProfilesDebounced } from '../lib/routing';
 
 // ---- Fix Leaflet marker icon paths ----
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -115,7 +115,7 @@ export function initMap(container: HTMLElement): L.Map {
     $activeTab.set('route');
 
     // Auto-calculate if we have at least 1 stop
-    calculateAllProfiles();
+    calculateAllProfilesDebounced();
   });
 
   // Sync map movement to store

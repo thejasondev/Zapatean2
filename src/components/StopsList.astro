@@ -45,7 +45,7 @@ import { MAX_STOPS } from '../lib/types';
 
 <script>
   import { $stops, $userPosition, removeStop, clearRoute } from '../lib/stores';
-  import { optimizeStopOrder, calculateAllProfiles } from '../lib/routing';
+  import { optimizeStopOrder, calculateAllProfilesDebounced } from '../lib/routing';
   import { vibrateTap } from '../lib/haptics';
   import { MAX_STOPS } from '../lib/types';
 
@@ -104,7 +104,7 @@ import { MAX_STOPS } from '../lib/types';
         removeStop(id);
         vibrateTap();
         // Recalculate if still have stops
-        if ($stops.get().length > 0) calculateAllProfiles();
+        if ($stops.get().length > 0) calculateAllProfilesDebounced();
       });
     });
   }
@@ -117,7 +117,7 @@ import { MAX_STOPS } from '../lib/types';
   btnOptimize.addEventListener('click', () => {
     vibrateTap();
     optimizeStopOrder();
-    calculateAllProfiles();
+    calculateAllProfilesDebounced();
   });
 
   // Clear

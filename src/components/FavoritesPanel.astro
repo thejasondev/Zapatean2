@@ -42,7 +42,7 @@
 <script>
   import { $favorites, $currentRoute, $stops, $routeParams, $activeTab } from '../lib/stores';
   import { saveFavorite, loadFavorites, deleteFavorite } from '../lib/db';
-  import { formatDistance, formatDuration, calculateAllProfiles } from '../lib/routing';
+  import { formatDistance, formatDuration, calculateAllProfilesDebounced } from '../lib/routing';
   import { vibrateTap, vibrateConfirm } from '../lib/haptics';
   import type { FavoriteRoute } from '../lib/types';
 
@@ -128,7 +128,7 @@
           $routeParams.set({ ...$routeParams.get(), profile: fav.profile });
           // Switch to route tab and calculate
           $activeTab.set('route');
-          calculateAllProfiles();
+          calculateAllProfilesDebounced();
         }
       });
     });

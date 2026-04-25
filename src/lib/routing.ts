@@ -14,6 +14,10 @@ export interface ProfileRouteResult {
   duration: number;
 }
 
+// Global controllers for throttling/debouncing
+let activeAbortController: AbortController | null = null;
+let calculateDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
 // ============================================
 // CORE: Calculate route (single or multi-stop)
 // ============================================
@@ -23,7 +27,8 @@ export interface ProfileRouteResult {
  */
 export async function calculateRoute(
   coordinates: LatLng[],
-  profile: TransportProfile
+  profile: TransportProfile,
+  signal?: AbortSignal
 ): Promise<RouteResult | null> {
   if (coordinates.length < 2) return null;
 
@@ -39,10 +44,14 @@ export async function calculateRoute(
         profile,
         mode: 'full',
       }),
+      signal,
     });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => null);
+      if (response.status === 429) {
+         throw new Error('Límite de cálculos alcanzado. Espera un momento.');
+      }
       throw new Error(errorData?.error || `Error del servidor: ${response.status}`);
     }
 
@@ -79,7 +88,11 @@ export async function calculateRoute(
 
     $currentRoute.set(routeResult);
     return routeResult;
-  } catch (err) {
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      console.log('[Zapatean2] Routing request aborted.');
+      return null; // Ignore aborts silently
+    }
     const message =
       err instanceof Error
         ? err.message
@@ -90,7 +103,10 @@ export async function calculateRoute(
     console.error('[Zapatean2] Routing error:', err);
     return null;
   } finally {
-    $isRouteLoading.set(false);
+    // Only set loading to false if this request wasn't aborted
+    if (!signal?.aborted) {
+      $isRouteLoading.set(false);
+    }
   }
 }
 
@@ -99,7 +115,8 @@ export async function calculateRoute(
  */
 async function fetchProfileSummary(
   coordinates: LatLng[],
-  profile: TransportProfile
+  profile: TransportProfile,
+  signal?: AbortSignal
 ): Promise<ProfileRouteResult | null> {
   if (coordinates.length < 2) return null;
 
@@ -112,6 +129,7 @@ async function fetchProfileSummary(
         profile,
         mode: 'summary',
       }),
+      signal,
     });
 
     if (!response.ok) return null;
@@ -125,7 +143,10 @@ async function fetchProfileSummary(
       distance: summary.distance,
       duration: summary.duration,
     };
-  } catch {
+  } catch (err: any) {
+    if (err.name !== 'AbortError') {
+       console.error('[Zapatean2] Summary fetch failed', err);
+    }
     return null;
   }
 }
@@ -158,28 +179,53 @@ export function buildRouteCoordinates(): LatLng[] {
 }
 
 /**
+ * Debounced version of calculateAllProfiles. 
+ * Use this from UI events (like Map clicks) to avoid hitting Rate Limits (HTTP 429).
+ */
+export function calculateAllProfilesDebounced(delayMs = 1200): void {
+  if (calculateDebounceTimer) {
+    clearTimeout(calculateDebounceTimer);
+  }
+  
+  $isRouteLoading.set(true); // Immediate visual feedback that we received the command
+  
+  calculateDebounceTimer = setTimeout(() => {
+    calculateAllProfiles();
+  }, delayMs);
+}
+
+/**
  * Calculate routes for ALL transport profiles simultaneously.
- * Primary profile gets full geometry, others get summaries.
+ * Cancels any ongoing requests automatically.
  */
 export async function calculateAllProfiles(
   coordinatesOverride?: LatLng[]
 ): Promise<void> {
+  // 1) Cancel exactly before starting new set
+  if (activeAbortController) {
+    activeAbortController.abort();
+  }
+  
+  // 2) Create new Abort Controller for this batch
+  activeAbortController = new AbortController();
+  const signal = activeAbortController.signal;
+
   const coordinates = coordinatesOverride || buildRouteCoordinates();
 
   if (coordinates.length < 2) {
     $error.set('Se necesitan al menos 2 puntos para calcular una ruta');
+    $isRouteLoading.set(false);
     return;
   }
 
   $isRouteLoading.set(true);
   $error.set(null);
-  $allProfileResults.set([]);
 
   const profiles = TRANSPORT_OPTIONS.map((opt) => opt.id);
 
   const promises = profiles.map(async (profile) => {
     if (profile === 'driving-car') {
-      const result = await calculateRoute(coordinates, profile);
+      const result = await calculateRoute(coordinates, profile, signal);
       if (result) {
         return {
           profile,
@@ -189,14 +235,17 @@ export async function calculateAllProfiles(
       }
       return null;
     }
-    return fetchProfileSummary(coordinates, profile);
+    return fetchProfileSummary(coordinates, profile, signal);
   });
 
   const results = await Promise.all(promises);
-  const validResults = results.filter(Boolean) as ProfileRouteResult[];
-
-  $allProfileResults.set(validResults);
-  $isRouteLoading.set(false);
+  
+  // 3) Only apply results if this specific calculation wasn't aborted midway
+  if (!signal.aborted) {
+    const validResults = results.filter(Boolean) as ProfileRouteResult[];
+    $allProfileResults.set(validResults);
+    $isRouteLoading.set(false);
+  }
 }
 
 // ============================================
