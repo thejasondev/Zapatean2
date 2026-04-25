@@ -179,25 +179,26 @@ import FavoritesPanel from './FavoritesPanel.astro';
 </script>
 
 <style>
+  /* 
+   * MOBILE FIRST BOTTOM SHEET 
+   */
   .sheet {
     height: calc(100dvh - 1rem); 
     overflow: hidden;
-    /* Adjust width on large screens to not look ridiculous */
     margin: 0 auto;
-    max-width: 600px;
     border-top-left-radius: 1.5rem;
     border-top-right-radius: 1.5rem;
-  }
-
-  @media (min-width: 640px) {
-    .sheet {
-      border: 1px solid oklch(0.5 0 0 / 0.1);
-      border-bottom: none;
-      box-shadow: 0 -10px 40px rgba(0,0,0,0.1);
-    }
-    :root[data-theme="night"] .sheet {
-      box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
-    }
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: var(--bg-elevated);
+    box-shadow: var(--shadow-active);
+    padding-bottom: var(--spacing-safe-bottom);
+    transition: transform 0.45s var(--ease-sheet), opacity 0.3s ease;
+    will-change: transform, opacity;
+    touch-action: none;
   }
 
   .sheet[data-state="half"],
@@ -269,5 +270,61 @@ import FavoritesPanel from './FavoritesPanel.astro';
     opacity: 1;
     pointer-events: auto;
     transition: opacity 0.3s ease 0.1s;
+  }
+
+  /* 
+   * DESKTOP (lg) - Transforma el BottomSheet en un Modal Flotante
+   */
+  @media (min-width: 1024px) {
+    .sheet {
+      /* Resetear BottomSheet */
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      bottom: auto;
+      right: auto;
+      transform: translate(-50%, -50%) !important;
+      width: 100%;
+      max-width: 440px;
+      height: auto;
+      max-height: 85vh; /* En lugar de full height */
+      border-radius: 1.5rem;
+      border: 1px solid oklch(0.5 0 0 / 0.1);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+
+    :root[data-theme="night"] .sheet {
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    }
+
+    /* Modal oculto cuando está en estado collapsed */
+    .sheet[data-state="collapsed"] {
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, -45%) scale(0.96) !important;
+    }
+
+    /* Modal visible en half/expanded */
+    .sheet[data-state="half"],
+    .sheet[data-state="expanded"] {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translate(-50%, -50%) scale(1) !important;
+    }
+
+    /* No queremos que el contenido desaparezca internamente, el modal entero lo hace */
+    .sheet[data-state="collapsed"] .sheet-content,
+    .sheet[data-state="collapsed"] .sheet-tabs-container {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .sheet-handle {
+      display: none; /* Quitamos la barra de arrastre */
+    }
+
+    .sheet-tabs-container {
+      padding-top: 1.25rem; /* Compensar la falta de handle */
+    }
   }
 </style>

@@ -119,30 +119,7 @@
    ============================================ */
 
 @layer components {
-  /* Bottom Sheet Panel */
-  .sheet {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 1000;
-    background: var(--bg-elevated);
-    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
-    box-shadow: var(--shadow-active);
-    padding-bottom: var(--spacing-safe-bottom);
-    transition: transform 0.45s var(--ease-sheet);
-    will-change: transform;
-    touch-action: none;
-  }
-
-  .sheet-handle {
-    width: 2.5rem;
-    height: 0.25rem;
-    margin: 0.5rem auto 0.75rem;
-    background: var(--text-muted);
-    border-radius: var(--radius-pill);
-    opacity: 0.4;
-  }
+  /* Component Utilities */
 
   /* Transport Profile Pill */
   .transport-pill {

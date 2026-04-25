@@ -14,27 +14,82 @@ import BottomSheet from '../components/BottomSheet.astro';
   <!-- Fullscreen Map -->
   <Map />
 
-  <!-- Search Bar (top, full width) -->
+  <!-- Search Bar (top center) -->
   <SearchBar />
 
-  <!-- Right Action Rail: grouped FABs -->
+  <!-- Action Rail: grouped FABs -->
   <div class="action-rail" id="action-rail">
+    <!-- Desktop only: Settings/Panel Toggle -->
+    <button id="btn-toggle-panel" class="fab-button panel-toggle-btn" aria-label="Abrir panel" title="Rutas y Ajustes">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="3" y1="12" x2="21" y2="12"></line>
+        <line x1="3" y1="6" x2="21" y2="6"></line>
+        <line x1="3" y1="18" x2="21" y2="18"></line>
+      </svg>
+    </button>
+    
     <ThemeToggle />
     <GpsButton />
   </div>
 
-  <!-- Bottom Navigation Sheet -->
+  <!-- Navigation Panel (BottomSheet on mobile / Modal on desktop) -->
   <BottomSheet />
 </BaseLayout>
 
+<script>
+  import { $sheetState } from '../lib/stores';
+  import { vibrateTap } from '../lib/haptics';
+
+  const btnTogglePanel = document.getElementById('btn-toggle-panel');
+
+  if (btnTogglePanel) {
+    btnTogglePanel.addEventListener('click', () => {
+      vibrateTap();
+      const st = $sheetState.get();
+      if (st === 'collapsed') {
+        $sheetState.set('half');
+      } else {
+        $sheetState.set('collapsed');
+      }
+    });
+  }
+</script>
+
 <style>
+  /* 
+   * MOBILE FIRST 
+   * Rail is placed top-right, just below the Search Bar.
+   * This completely avoids overlapping with the BottomSheet at the bottom.
+   */
   .action-rail {
     position: fixed;
+    top: calc(4.5rem + env(safe-area-inset-top, 0px)); /* Below search bar */
     right: 0.75rem;
-    bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
     z-index: 950;
     display: flex;
     flex-direction: column;
     gap: 0.625rem;
   }
+
+  .panel-toggle-btn {
+    display: none; /* Hidden on mobile, BottomSheet handle does the job */
+  }
+
+  /* 
+   * DESKTOP (lg)
+   * Rail moves to top-left, search bar is centered.
+   * Panel toggle button appears.
+   */
+  @media (min-width: 1024px) {
+    .action-rail {
+      top: calc(0.625rem + env(safe-area-inset-top, 0px));
+      left: 0.75rem;
+      right: auto;
+    }
+
+    .panel-toggle-btn {
+      display: flex;
+    }
+  }
 </style>
+
