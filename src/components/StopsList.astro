@@ -224,11 +224,24 @@ import { MAX_STOPS } from '../lib/types';
       profile: $routeParams.get().profile || 'driving-car'
     };
 
-    saveTripRecord(record).then(() => {
+    saveTripRecord(record).then(async () => {
       loadTripRecords().then(t => $tripRecords.set(t));
+      const addresses = stops.map(s => s.label);
       clearRoute();
       $sheetState.set('collapsed');
-      alert(`¡Viaje registrado exitosamente en tu Billetera!`);
+      
+      const wantsReceipt = window.confirm(`¡Viaje registrado! Ganancia: $${cost} CUP.\n\n¿Deseas generar y compartir el Recibo Digital con el cliente?`);
+      if (wantsReceipt) {
+        // Dynamically import receipt logic to keep bundle small until used
+        const { generateReceiptAndShare } = await import('../lib/receipt');
+        generateReceiptAndShare({
+          date: record.date,
+          distanceKm: distKm,
+          costCup: cost,
+          stopsCount: record.stopsCount,
+          addresses
+        });
+      }
     });
   });
 </script>

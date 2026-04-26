@@ -45,6 +45,7 @@
   import { vibrateTap } from '../lib/haptics';
   import { calculateAllProfilesDebounced } from '../lib/routing';
   import type { GeocodingResult } from '../lib/types';
+  import { saveGeoCache, loadGeoCache } from '../lib/db';
 
   const input = document.getElementById('search-address') as HTMLInputElement;
   const resultsContainer = document.getElementById('search-results')!;
@@ -63,8 +64,6 @@
   // ---- Nominatim Geocoding ----
   async function searchAddress(query: string): Promise<GeocodingResult[]> {
     if (query.length < 3) return [];
-
-    $isSearching.set(true);
 
     try {
       const params = new URLSearchParams({
@@ -86,7 +85,13 @@
       );
 
       if (!response.ok) return [];
-      return await response.json();
+      const results = await response.json();
+      
+      // Save locally to power predictive autocomplete
+      if (results.length > 0) {
+        saveGeoCache(query, results).catch(()=>{});
+      }
+      return results;
     } catch (err) {
       console.error('[Zapatean2] Geocoding error:', err);
       return [];
@@ -156,7 +161,7 @@
   }
 
   // ---- Input handlers ----
-  input.addEventListener('input', () => {
+  input.addEventListener('input', async () => {
     const query = input.value.trim();
     clearBtn.style.display = query ? 'flex' : 'none';
 
@@ -165,9 +170,22 @@
     if (query.length < 3) {
       resultsContainer.style.display = 'none';
       $searchResults.set([]);
+      $isSearching.set(false);
       return;
     }
 
+    // 1. Instant local predictive check
+    const localMatches = await loadGeoCache(query);
+    if (localMatches && localMatches.length > 0) {
+      $searchResults.set(localMatches);
+      renderResults(localMatches);
+      $isSearching.set(false);
+      return; // Fast path! Found locally, skip network completely
+    }
+
+    // 2. Not found locally -> Show Spinner and Debounce network hit
+    $isSearching.set(true);
+    
     debounceTimer = setTimeout(async () => {
       const results = await searchAddress(query);
       $searchResults.set(results);

@@ -3,7 +3,7 @@
 // Lightweight wrapper for persisting app data
 // ============================================
 
-import type { CostConfig, FavoriteRoute, TripRecord, OfflineRouteCache } from './types';
+import type { CostConfig, FavoriteRoute, TripRecord, OfflineRouteCache, GeocodingResult } from './types';
 import { DEFAULT_COST_CONFIG } from './types';
 
 const DB_NAME = 'zapatean2';
@@ -15,6 +15,7 @@ const STORES = {
   CONFIG: 'config',
   TRIPS: 'trips',
   ROUTE_CACHE: 'route_cache',
+  GEO_CACHE: 'geo_cache',
 } as const;
 
 /** Open (or create) the database */
@@ -35,6 +36,9 @@ function openDB(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(STORES.ROUTE_CACHE)) {
         db.createObjectStore(STORES.ROUTE_CACHE, { keyPath: 'hash' });
+      }
+      if (!db.objectStoreNames.contains(STORES.GEO_CACHE)) {
+        db.createObjectStore(STORES.GEO_CACHE, { keyPath: 'query' });
       }
     };
 
@@ -167,6 +171,38 @@ export async function loadRouteCache(hash: string): Promise<OfflineRouteCache | 
       const store = tx.objectStore(STORES.ROUTE_CACHE);
       const request = store.get(hash);
       request.onsuccess = () => resolve(request.result ?? null);
+      request.onerror = () => resolve(null);
+    });
+  } catch {
+    return null;
+  }
+}
+
+// ============================================
+// GEOCODING CACHE (Predictive Search)
+// ============================================
+
+export async function saveGeoCache(query: string, results: GeocodingResult[]): Promise<void> {
+  const data = { query: query.toLowerCase(), results, timestamp: Date.now() };
+  await put(STORES.GEO_CACHE, data);
+}
+
+export async function loadGeoCache(query: string): Promise<GeocodingResult[] | null> {
+  try {
+    const db = await openDB();
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORES.GEO_CACHE, 'readonly');
+      const store = tx.objectStore(STORES.GEO_CACHE);
+      const request = store.get(query.toLowerCase());
+      request.onsuccess = () => {
+        if (request.result) {
+          // Cache expires after 30 days
+          const isFresh = Date.now() - request.result.timestamp < 30 * 24 * 60 * 60 * 1000;
+          resolve(isFresh ? request.result.results : null);
+        } else {
+          resolve(null);
+        }
+      };
       request.onerror = () => resolve(null);
     });
   } catch {
