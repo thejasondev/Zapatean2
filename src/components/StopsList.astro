@@ -329,7 +329,7 @@ import { MAX_STOPS } from '../lib/types';
             try {
               await navigator.share({
                 title: 'Recibo Zapatean2',
-                text: \`Comprobante de entrega por \${distKm.toFixed(1)} km y \${record.stopsCount} paradas. Total: $\${cost} CUP.\`,
+                text: `Comprobante de entrega por ${distKm.toFixed(1)} km y ${record.stopsCount} paradas. Total: $${cost} CUP.`,
                 files: [receiptFile!]
               });
               // Do not auto-close if success, let them stay on the preview in case they want to share again.
