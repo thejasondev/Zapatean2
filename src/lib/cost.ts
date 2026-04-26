@@ -2,38 +2,22 @@
 // ZAPATEAN2 — Trip Cost Calculator
 // ============================================
 
-import type { TransportProfile, CostConfig, TripCost } from './types';
+import { type CostConfig, type TripCost, type RouteResult, type TransportProfile } from './types';
 
 /**
- * Calculate the estimated cost of a trip.
+ * Calculates the trip cost simply based on total distance and global price per km.
  */
 export function calculateTripCost(
-  distanceMeters: number,
-  profile: TransportProfile,
+  route: RouteResult,
   config: CostConfig
 ): TripCost {
-  const distanceKm = distanceMeters / 1000;
-  const pricePerKm = config.pricePerKm[profile] ?? 0;
-  const totalCup = Math.round(distanceKm * pricePerKm);
-
-  // Fuel calculation (only for motorized vehicles)
-  let fuelLiters = 0;
-  let fuelCostCup = 0;
-
-  if (profile === 'driving-car') {
-    fuelLiters = config.autoKmPerLiter > 0 ? distanceKm / config.autoKmPerLiter : 0;
-    fuelCostCup = Math.round(fuelLiters * config.fuelPricePerLiter);
-  } else if (profile === 'cycling-electric') {
-    // Moto / electric cycling profile
-    fuelLiters = config.motoKmPerLiter > 0 ? distanceKm / config.motoKmPerLiter : 0;
-    fuelCostCup = Math.round(fuelLiters * config.fuelPricePerLiter);
-  }
+  // Distance is provided in meters by ORS
+  const distanceKm = route.distance / 1000;
+  const suggestedCup = distanceKm * config.pricePerKm;
 
   return {
-    totalCup: Math.max(totalCup, fuelCostCup), // Use the higher of tariff vs fuel cost
-    fuelLiters: parseFloat(fuelLiters.toFixed(2)),
-    fuelCostCup,
-    pricePerKm,
+    suggestedCup: Math.max(0, suggestedCup),
+    totalCup: Math.max(0, suggestedCup), // User can override this later in the UI
   };
 }
 

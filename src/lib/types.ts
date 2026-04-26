@@ -90,41 +90,23 @@ export interface DeliveryStop {
   completed: boolean;
 }
 
-/** Cost configuration per transport (user-editable, persisted) */
+/** Cost configuration (user-editable, persisted) */
 export interface CostConfig {
-  /** Price per km for each profile (CUP) */
-  pricePerKm: Record<TransportProfile, number>;
-  /** Fuel price per liter in CUP (for moto/auto) */
-  fuelPricePerLiter: number;
-  /** Fuel consumption in km per liter (for moto) */
-  motoKmPerLiter: number;
-  /** Fuel consumption in km per liter (for auto) */
-  autoKmPerLiter: number;
+  /** Global price per km */
+  pricePerKm: number;
 }
 
 /** Default cost configuration */
 export const DEFAULT_COST_CONFIG: CostConfig = {
-  pricePerKm: {
-    'driving-car': 25,
-    'cycling-electric': 15,
-    'cycling-regular': 0,
-    'foot-walking': 0,
-  },
-  fuelPricePerLiter: 132,
-  motoKmPerLiter: 35,
-  autoKmPerLiter: 12,
+  pricePerKm: 25,
 };
 
 /** Calculated trip cost */
 export interface TripCost {
-  /** Total cost in CUP */
+  /** Suggested total based on km */
+  suggestedCup: number;
+  /** Actual total the user decided to charge */
   totalCup: number;
-  /** Fuel used in liters */
-  fuelLiters: number;
-  /** Fuel cost portion in CUP */
-  fuelCostCup: number;
-  /** Price per km used */
-  pricePerKm: number;
 }
 
 /** Saved favorite route */

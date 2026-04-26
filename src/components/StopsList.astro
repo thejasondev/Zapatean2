@@ -44,7 +44,7 @@ import { MAX_STOPS } from '../lib/types';
 </div>
 
 <script>
-  import { $stops, $userPosition, removeStop, clearRoute } from '../lib/stores';
+  import { $stops, $userPosition, removeStop, clearRoute, renameStop } from '../lib/stores';
   import { optimizeStopOrder, calculateAllProfilesDebounced } from '../lib/routing';
   import { vibrateTap } from '../lib/haptics';
   import { MAX_STOPS } from '../lib/types';
@@ -84,7 +84,7 @@ import { MAX_STOPS } from '../lib/types';
             ${stop.completed ? '✓' : stop.order + 1}
           </div>
           <div class="stop-info">
-            <span class="stop-label">${stop.label}</span>
+            <span class="stop-label" contenteditable="true" spellcheck="false" data-edit-id="${stop.id}">${stop.label}</span>
             <span class="stop-coords">${stop.position.lat.toFixed(4)}, ${stop.position.lng.toFixed(4)}</span>
           </div>
           <button class="stop-remove" data-remove-id="${stop.id}" aria-label="Eliminar parada" title="Eliminar">
@@ -105,6 +105,24 @@ import { MAX_STOPS } from '../lib/types';
         vibrateTap();
         // Recalculate if still have stops
         if ($stops.get().length > 0) calculateAllProfilesDebounced();
+      });
+    });
+
+    // Rename labels
+    listEl.querySelectorAll('.stop-label').forEach((lbl) => {
+      lbl.addEventListener('blur', (e) => {
+        const target = e.target as HTMLElement;
+        const id = target.dataset.editId!;
+        const newText = target.textContent?.trim() || '';
+        if (newText) {
+          renameStop(id, newText);
+        }
+      });
+      lbl.addEventListener('keydown', (e) => {
+        if ((e as KeyboardEvent).key === 'Enter') {
+          e.preventDefault();
+          (e.target as HTMLElement).blur();
+        }
       });
     });
   }
@@ -222,6 +240,22 @@ import { MAX_STOPS } from '../lib/types';
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    outline: none;
+    padding: 0.125rem 0.25rem;
+    margin-left: -0.25rem;
+    border-radius: 0.25rem;
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
+  }
+
+  .stop-label:hover {
+    background: oklch(0.5 0 0 / 0.04);
+    border-color: oklch(0.5 0 0 / 0.1);
+  }
+
+  .stop-label:focus {
+    background: var(--bg-elevated);
+    border-color: var(--color-brand-400);
   }
 
   .stop-coords {

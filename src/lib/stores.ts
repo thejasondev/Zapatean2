@@ -114,15 +114,25 @@ export function addStop(position: LatLng, label?: string): DeliveryStop | null {
 }
 
 /** Remove a delivery stop by ID */
-export function removeStop(id: string): void {
-  const filtered = $stops.get().filter((s) => s.id !== id);
-  // Reorder
-  const reordered = filtered.map((s, i) => ({
+export function removeStop(id: string) {
+  const current = $stops.get();
+  const rest = current.filter((s) => s.id !== id);
+  const relabeled = rest.map((s, idx) => ({
     ...s,
-    order: i,
-    label: s.label.startsWith('Parada') ? `Parada ${i + 1}` : s.label,
+    order: idx,
+    label: s.label.startsWith('Punto') || s.label.startsWith('Parada') 
+             ? `Parada ${idx + 1}` 
+             : s.label,
   }));
-  $stops.set(reordered);
+  $stops.set(relabeled);
+}
+
+export function renameStop(id: string, newLabel: string) {
+  const current = $stops.get();
+  const updated = current.map((s) => 
+    s.id === id ? { ...s, label: newLabel } : s
+  );
+  $stops.set(updated);
 }
 
 /** Reorder stops (after optimization or manual drag) */

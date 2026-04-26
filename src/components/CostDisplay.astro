@@ -41,64 +41,49 @@ import { TRANSPORT_OPTIONS } from '../lib/types';
       <circle cx="12" cy="12" r="3"/>
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
     </svg>
-    <span>Configurar tarifas</span>
+    <span>Ajustes de precio</span>
   </button>
 
   <div id="cost-config" class="cost-config" style="display:none;">
     <div class="config-group">
-      <label class="config-label">Tarifa Auto (CUP/km)</label>
-      <input type="number" id="config-auto" class="config-input" value="25" min="0" step="1" />
+      <label class="config-label">Tarifa Global (CUP/km)</label>
+      <input type="number" id="config-price-km" class="config-input" value="25" min="0" step="1" />
     </div>
     <div class="config-group">
-      <label class="config-label">Tarifa Moto (CUP/km)</label>
-      <input type="number" id="config-moto" class="config-input" value="15" min="0" step="1" />
-    </div>
-    <div class="config-group">
-      <label class="config-label">Precio gasolina (CUP/L)</label>
-      <input type="number" id="config-fuel" class="config-input" value="132" min="0" step="1" />
-    </div>
-    <div class="config-group">
-      <label class="config-label">Rendimiento moto (km/L)</label>
-      <input type="number" id="config-moto-kml" class="config-input" value="35" min="1" step="1" />
-    </div>
-    <div class="config-group">
-      <label class="config-label">Rendimiento auto (km/L)</label>
-      <input type="number" id="config-auto-kml" class="config-input" value="12" min="1" step="1" />
+      <label class="config-label">Cobro exacto del cliente (CUP)</label>
+      <input type="number" id="config-manual-total" class="config-input" placeholder="Ej: 500 (Opcional)" min="0" step="1" />
     </div>
   </div>
 </div>
 
 <script>
   import { $allProfileResults, $costConfig, updateCostConfig } from '../lib/stores';
-  import { calculateTripCost, formatCUP, formatFuel } from '../lib/cost';
-  import type { TransportProfile } from '../lib/types';
+  import { calculateTripCost } from '../lib/cost';
+  import { formatCUP } from '../lib/cost';
   import { saveCostConfig, loadCostConfig } from '../lib/db';
   import { vibrateTap } from '../lib/haptics';
 
   const costResult = document.getElementById('cost-result')!;
   const costTotal = document.getElementById('cost-total')!;
   const costFuel = document.getElementById('cost-fuel')!;
-  const costFuelText = document.getElementById('cost-fuel-text')!;
   const costGrid = document.getElementById('cost-grid')!;
   const costEmpty = document.getElementById('cost-empty')!;
   const configToggle = document.getElementById('cost-config-toggle')!;
   const configPanel = document.getElementById('cost-config')!;
 
   // Config inputs
-  const inputAuto = document.getElementById('config-auto') as HTMLInputElement;
-  const inputMoto = document.getElementById('config-moto') as HTMLInputElement;
-  const inputFuel = document.getElementById('config-fuel') as HTMLInputElement;
-  const inputMotoKml = document.getElementById('config-moto-kml') as HTMLInputElement;
-  const inputAutoKml = document.getElementById('config-auto-kml') as HTMLInputElement;
+  const inputPriceKm = document.getElementById('config-price-km') as HTMLInputElement;
+  const inputManualTotal = document.getElementById('config-manual-total') as HTMLInputElement;
+
+  // Local state for manual override
+  let manualOverride: number | null = null;
+  // Hold the last calculated primary result distance
+  let currentDistanceMeters = 0;
 
   // ---- Load persisted config ----
   loadCostConfig().then((config) => {
     $costConfig.set(config);
-    inputAuto.value = String(config.pricePerKm['driving-car']);
-    inputMoto.value = String(config.pricePerKm['cycling-electric']);
-    inputFuel.value = String(config.fuelPricePerLiter);
-    inputMotoKml.value = String(config.motoKmPerLiter);
-    inputAutoKml.value = String(config.autoKmPerLiter);
+    inputPriceKm.value = String(config.pricePerKm);
   });
 
   // ---- Config toggle ----
@@ -111,25 +96,20 @@ import { TRANSPORT_OPTIONS } from '../lib/types';
   // ---- Config input handlers ----
   function onConfigChange() {
     const newConfig = {
-      pricePerKm: {
-        'driving-car': parseInt(inputAuto.value) || 0,
-        'cycling-electric': parseInt(inputMoto.value) || 0,
-        'cycling-regular': 0,
-        'foot-walking': 0,
-      } as Record<TransportProfile, number>,
-      fuelPricePerLiter: parseInt(inputFuel.value) || 0,
-      motoKmPerLiter: parseInt(inputMotoKml.value) || 1,
-      autoKmPerLiter: parseInt(inputAutoKml.value) || 1,
+      pricePerKm: parseInt(inputPriceKm.value) || 0,
     };
     updateCostConfig(newConfig);
     saveCostConfig($costConfig.get());
+
+    const manualVal = parseInt(inputManualTotal.value);
+    manualOverride = isNaN(manualVal) ? null : manualVal;
+
     // Re-render costs
     renderCosts();
   }
 
-  [inputAuto, inputMoto, inputFuel, inputMotoKml, inputAutoKml].forEach((input) => {
-    input.addEventListener('change', onConfigChange);
-  });
+  inputPriceKm.addEventListener('input', onConfigChange);
+  inputManualTotal.addEventListener('input', onConfigChange);
 
   // ---- Render costs ----
   function renderCosts() {
@@ -145,34 +125,32 @@ import { TRANSPORT_OPTIONS } from '../lib/types';
 
     costEmpty.style.display = 'none';
     costGrid.style.display = 'grid';
+    costFuel.style.display = 'none'; // We don't display fuel portion anymore
 
-    // Calculate cost for each profile
+    // Find the primary routing
     const primaryResult = results.find((r) => r.profile === 'driving-car') || results[0];
+    currentDistanceMeters = primaryResult?.distance || 0;
 
+    // Display the specific Transport Card estimates based globally
     results.forEach((r) => {
-      const cost = calculateTripCost(r.distance, r.profile as TransportProfile, config);
+      const distanceKm = r.distance / 1000;
+      const suggestedCup = distanceKm * config.pricePerKm;
+      const finalCost = manualOverride !== null ? manualOverride : suggestedCup;
+
       const valueEl = document.querySelector(`[data-cost-for="${r.profile}"]`);
       if (valueEl) {
-        valueEl.textContent = cost.totalCup > 0 ? formatCUP(cost.totalCup) : 'Gratis';
+        valueEl.textContent = finalCost > 0 ? formatCUP(finalCost) : 'Gratis';
       }
     });
 
-    // Show primary cost
+    // Display primary cost banner
     if (primaryResult) {
-      const primaryCost = calculateTripCost(
-        primaryResult.distance,
-        primaryResult.profile as TransportProfile,
-        config
-      );
-      costResult.style.display = 'flex';
-      costTotal.textContent = primaryCost.totalCup > 0 ? formatCUP(primaryCost.totalCup) : 'Gratis';
+      const distanceKm = currentDistanceMeters / 1000;
+      const suggestedCup = distanceKm * config.pricePerKm;
+      const finalCost = manualOverride !== null ? manualOverride : suggestedCup;
 
-      if (primaryCost.fuelLiters > 0) {
-        costFuel.style.display = 'flex';
-        costFuelText.textContent = `${formatFuel(primaryCost.fuelLiters)} gasolina`;
-      } else {
-        costFuel.style.display = 'none';
-      }
+      costResult.style.display = 'flex';
+      costTotal.textContent = finalCost > 0 ? formatCUP(finalCost) : 'Gratis';
     }
   }
 
