@@ -230,11 +230,6 @@ import WalletPanel from './WalletPanel.astro';
     touch-action: none; /* Only the handle disables native scroll */
   }
 
-  .sheet[data-state="half"],
-  .sheet[data-state="expanded"] {
-    overflow-y: auto;
-  }
-
   /* Tabs styling */
   .sheet-tabs-container {
     padding: 0 1.25rem 1rem;
@@ -283,17 +278,37 @@ import WalletPanel from './WalletPanel.astro';
 
   .sheet-content {
     padding: 0 1.25rem 1.5rem;
+    overflow-y: auto;
   }
 
-  /* Smooth reveal of content */
-  .sheet[data-state="collapsed"] .sheet-content,
+  /* Smooth reveal and scroll boundaries */
+  .sheet[data-state="collapsed"] .sheet-content {
+    opacity: 0;
+    pointer-events: none;
+    max-height: 0;
+  }
+
+  .sheet[data-state="half"] .sheet-content {
+    opacity: 1;
+    pointer-events: auto;
+    transition: opacity 0.3s ease 0.1s;
+    /* Limit height so content natively scrolls within the 50% visible area */
+    max-height: calc(50dvh - 6rem);
+  }
+
+  .sheet[data-state="expanded"] .sheet-content {
+    opacity: 1;
+    pointer-events: auto;
+    transition: opacity 0.3s ease 0.1s;
+    /* Full screen scrollable */
+    max-height: calc(100dvh - 6rem);
+  }
+
   .sheet[data-state="collapsed"] .sheet-tabs-container {
     opacity: 0;
     pointer-events: none;
   }
-
-  .sheet[data-state="half"] .sheet-content,
-  .sheet[data-state="expanded"] .sheet-content,
+  
   .sheet[data-state="half"] .sheet-tabs-container,
   .sheet[data-state="expanded"] .sheet-tabs-container {
     opacity: 1;
@@ -346,6 +361,12 @@ import WalletPanel from './WalletPanel.astro';
     .sheet[data-state="collapsed"] .sheet-tabs-container {
       opacity: 1;
       pointer-events: auto;
+      max-height: 80vh;
+    }
+    
+    .sheet[data-state="half"] .sheet-content,
+    .sheet[data-state="expanded"] .sheet-content {
+      max-height: 80vh;
     }
 
     .sheet-handle {
