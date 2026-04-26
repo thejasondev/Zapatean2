@@ -16,6 +16,8 @@ import type {
   DeliveryStop,
   CostConfig,
   FavoriteRoute,
+  TripRecord,
+  AvoidZone,
 } from './types';
 import { CUBA_CENTER, DEFAULT_ZOOM, DEFAULT_COST_CONFIG, MAX_STOPS } from './types';
 
@@ -170,6 +172,18 @@ export function updateCostConfig(patch: Partial<CostConfig>): void {
 // ============================================
 
 export const $favorites = atom<FavoriteRoute[]>([]);
+
+// ============================================
+// WALLET / EARNINGS (Fase 2)
+// ============================================
+
+export const $tripRecords = atom<TripRecord[]>([]);
+
+// ============================================
+// AVOID ZONES (Fase 2)
+// ============================================
+
+export const $avoidZones = atom<AvoidZone[]>([]);
 
 // ============================================
 // HELPERS

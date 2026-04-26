@@ -18,22 +18,32 @@ import { MAX_STOPS } from '../lib/types';
   <div id="stops-list" class="stops-list" style="display:none;"></div>
 
   <!-- Actions bar -->
-  <div id="stops-actions" class="stops-actions" style="display:none;">
-    <button id="btn-optimize" class="stops-btn stops-btn--accent" title="Optimizar orden de paradas">
+  <div class="stops-footer">
+    <div id="stops-actions" class="stops-actions" style="display:none;">
+      <button id="btn-optimize" class="stops-btn stops-btn--accent" title="Optimizar orden de paradas">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="17 1 21 5 17 9"/>
+          <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+          <polyline points="7 23 3 19 7 15"/>
+          <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+        </svg>
+        <span>Optimizar</span>
+      </button>
+      <button id="btn-clear-stops" class="stops-btn stops-btn--ghost" title="Limpiar todas las paradas">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+        </svg>
+        <span>Limpiar</span>
+      </button>
+    </div>
+    
+    <button id="btn-finish-trip" class="stops-btn stops-btn--finish" style="display:none;" title="Terminar y Guardar en Billetera">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="17 1 21 5 17 9"/>
-        <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-        <polyline points="7 23 3 19 7 15"/>
-        <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+        <polyline points="22 4 12 14.01 9 11.01"/>
       </svg>
-      <span>Optimizar</span>
-    </button>
-    <button id="btn-clear-stops" class="stops-btn stops-btn--ghost" title="Limpiar todas las paradas">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="3 6 5 6 21 6"/>
-        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-      </svg>
-      <span>Limpiar</span>
+      <span>Finalizar Viaje</span>
     </button>
   </div>
 
@@ -44,10 +54,11 @@ import { MAX_STOPS } from '../lib/types';
 </div>
 
 <script>
-  import { $stops, $userPosition, removeStop, clearRoute, renameStop } from '../lib/stores';
+  import { $stops, $userPosition, removeStop, clearRoute, renameStop, $currentRoute, $costConfig, $routeParams, $sheetState, $tripRecords } from '../lib/stores';
   import { optimizeStopOrder, calculateAllProfilesDebounced } from '../lib/routing';
   import { vibrateTap } from '../lib/haptics';
   import { MAX_STOPS } from '../lib/types';
+  import { saveTripRecord, loadTripRecords } from '../lib/db';
 
   const emptyEl = document.getElementById('stops-empty')!;
   const listEl = document.getElementById('stops-list')!;
@@ -56,6 +67,7 @@ import { MAX_STOPS } from '../lib/types';
   const countText = document.getElementById('stops-count-text')!;
   const btnOptimize = document.getElementById('btn-optimize')!;
   const btnClear = document.getElementById('btn-clear-stops')!;
+  const btnFinish = document.getElementById('btn-finish-trip')!;
 
   function renderStops() {
     const stops = $stops.get();
@@ -65,6 +77,7 @@ import { MAX_STOPS } from '../lib/types';
       emptyEl.style.display = 'flex';
       listEl.style.display = 'none';
       actionsEl.style.display = 'none';
+      btnFinish.style.display = 'none';
       counterEl.style.display = 'none';
       return;
     }
@@ -72,6 +85,7 @@ import { MAX_STOPS } from '../lib/types';
     emptyEl.style.display = 'none';
     listEl.style.display = 'flex';
     actionsEl.style.display = 'flex';
+    btnFinish.style.display = 'flex';
     counterEl.style.display = 'flex';
 
     countText.textContent = `${stops.length}/${MAX_STOPS} paradas`;
@@ -87,6 +101,11 @@ import { MAX_STOPS } from '../lib/types';
             <span class="stop-label" contenteditable="true" spellcheck="false" data-edit-id="${stop.id}">${stop.label}</span>
             <span class="stop-coords">${stop.position.lat.toFixed(4)}, ${stop.position.lng.toFixed(4)}</span>
           </div>
+          <button class="stop-wa" data-wa-index="${stop.order}" aria-label="Avisar por WhatsApp" title="Enviar ETA por WhatsApp">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+            </svg>
+          </button>
           <button class="stop-remove" data-remove-id="${stop.id}" aria-label="Eliminar parada" title="Eliminar">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -125,6 +144,35 @@ import { MAX_STOPS } from '../lib/types';
         }
       });
     });
+
+    // WhatsApp logic
+    listEl.querySelectorAll('.stop-wa').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        vibrateTap();
+        
+        const route = $currentRoute.get();
+        const config = $costConfig.get();
+        let distKm = 0;
+        let timeMin = 0;
+        let price = 0;
+
+        if (route) {
+          distKm = route.distance / 1000;
+          timeMin = Math.ceil(route.duration / 60);
+          
+          const manualInput = document.getElementById('config-manual-total') as HTMLInputElement;
+          const manual = manualInput ? manualInput.value : '';
+          price = manual ? parseInt(manual) : Math.round(distKm * config.pricePerKm);
+        }
+        
+        const distStr = distKm > 0 ? ` me encuentro a ${distKm.toFixed(1)} km y llego en aproximadamente ${timeMin} minutos.` : ' voy en camino.';
+        const priceStr = price > 0 ? ` El total es $${price} CUP.` : '';
+        const msg = `¡Hola! Soy tu mensajero.${distStr}${priceStr}`;
+        
+        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+      });
+    });
   }
 
   $stops.subscribe(renderStops);
@@ -142,6 +190,46 @@ import { MAX_STOPS } from '../lib/types';
   btnClear.addEventListener('click', () => {
     vibrateTap();
     clearRoute();
+  });
+
+  // Finish Trip
+  btnFinish.addEventListener('click', async () => {
+    vibrateTap();
+    const route = $currentRoute.get();
+    const config = $costConfig.get();
+    const stops = $stops.get();
+    
+    if (!route || stops.length === 0) {
+      alert("Traza una ruta primero para finalizarla.");
+      return;
+    }
+
+    const manualInput = document.getElementById('config-manual-total') as HTMLInputElement;
+    const manual = manualInput ? manualInput.value : '';
+    const distKm = route.distance / 1000;
+    const defaultCost = Math.round(distKm * config.pricePerKm);
+    const finalVal = manual ? parseInt(manual) : defaultCost;
+
+    const input = window.prompt('Finalizar Viaje\nIntroduce el importe final cobrado al cliente (CUP):', finalVal.toString());
+    if (input === null) return; // Cancelled
+    
+    const cost = parseInt(input) || 0;
+
+    const record = {
+      id: `trip_${Date.now()}`,
+      date: Date.now(),
+      distanceMeters: route.distance,
+      totalCup: cost,
+      stopsCount: stops.length,
+      profile: $routeParams.get().profile || 'driving-car'
+    };
+
+    saveTripRecord(record).then(() => {
+      loadTripRecords().then(t => $tripRecords.set(t));
+      clearRoute();
+      $sheetState.set('collapsed');
+      alert(`¡Viaje registrado exitosamente en tu Billetera!`);
+    });
   });
 </script>
 
@@ -288,6 +376,33 @@ import { MAX_STOPS } from '../lib/types';
     transform: scale(0.85);
   }
 
+  .stop-wa {
+    width: 1.75rem;
+    height: 1.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: oklch(0.5 0 0 / 0.04);
+    border-radius: 50%;
+    color: var(--color-brand-500);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+  }
+
+  .stop-wa:hover {
+    background: var(--color-brand-500);
+    color: white;
+  }
+
+  .stops-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+  }
+
   /* Actions */
   .stops-actions {
     display: flex;
@@ -308,6 +423,20 @@ import { MAX_STOPS } from '../lib/types';
     cursor: pointer;
     transition: all 0.2s ease;
     border: none;
+  }
+
+  .stops-btn--finish {
+    background: oklch(0.6 0.15 155); /* Elegant Green */
+    color: white;
+    width: 100%;
+  }
+
+  .stops-btn--finish:hover {
+    filter: brightness(1.1);
+  }
+
+  .stops-btn--finish:active {
+    transform: scale(0.97);
   }
 
   .stops-btn--accent {

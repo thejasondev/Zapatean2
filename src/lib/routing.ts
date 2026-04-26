@@ -5,7 +5,8 @@
 
 import type { LatLng, RouteResult, TransportProfile, RouteInstruction, DeliveryStop } from './types';
 import { TRANSPORT_OPTIONS } from './types';
-import { $currentRoute, $isRouteLoading, $error, $allProfileResults, $stops, $userPosition, reorderStops } from './stores';
+import { $currentRoute, $isRouteLoading, $error, $allProfileResults, $stops, $userPosition, reorderStops, $avoidZones } from './stores';
+import { saveRouteCache, loadRouteCache } from './db';
 
 /** Result for a single profile */
 export interface ProfileRouteResult {
@@ -35,15 +36,15 @@ export async function calculateRoute(
   $isRouteLoading.set(true);
   $error.set(null);
 
+  const avoidZones = $avoidZones.get();
+  const requestBody = { coordinates, profile, mode: 'full', avoidZones };
+  const reqHash = JSON.stringify(requestBody);
+
   try {
     const response = await fetch('/api/route', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        coordinates,
-        profile,
-        mode: 'full',
-      }),
+      body: reqHash,
       signal,
     });
 
@@ -87,11 +88,24 @@ export async function calculateRoute(
     };
 
     $currentRoute.set(routeResult);
+    
+    // Save to Cache
+    saveRouteCache({ hash: reqHash, timestamp: Date.now(), result: routeResult }).catch(() => {});
+
     return routeResult;
   } catch (err: any) {
     if (err.name === 'AbortError') {
       console.log('[Zapatean2] Routing request aborted.');
-      return null; // Ignore aborts silently
+      return null;
+    }
+
+    // Offline fallback check
+    if (err instanceof TypeError && err.message.includes('fetch')) {
+      const cached = await loadRouteCache(reqHash);
+      if (cached && cached.result) {
+        $currentRoute.set(cached.result);
+        return cached.result;
+      }
     }
     const message =
       err instanceof Error
@@ -120,31 +134,39 @@ async function fetchProfileSummary(
 ): Promise<ProfileRouteResult | null> {
   if (coordinates.length < 2) return null;
 
+  const avoidZones = $avoidZones.get();
+  const requestBody = { coordinates, profile, mode: 'summary', avoidZones };
+  const reqHash = JSON.stringify(requestBody);
+
   try {
     const response = await fetch('/api/route', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        coordinates,
-        profile,
-        mode: 'summary',
-      }),
+      body: reqHash,
       signal,
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) throw new Error('API fetching error');
 
     const data = await response.json();
     const summary = data.routes?.[0]?.summary;
     if (!summary) return null;
 
-    return {
+    const result = {
       profile,
       distance: summary.distance,
       duration: summary.duration,
     };
+    
+    saveRouteCache({ hash: reqHash, timestamp: Date.now(), result }).catch(() => {});
+
+    return result;
   } catch (err: any) {
     if (err.name !== 'AbortError') {
+       if (err instanceof TypeError && err.message.includes('fetch')) {
+         const cached = await loadRouteCache(reqHash);
+         if (cached && cached.result) return cached.result;
+       }
        console.error('[Zapatean2] Summary fetch failed', err);
     }
     return null;

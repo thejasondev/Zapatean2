@@ -1,0 +1,298 @@
+---
+/**
+ * WalletPanel.astro — Earnings tracking and history for messengers
+ */
+---
+
+<div id="wallet-panel" class="wallet-panel" style="display:none;">
+  <!-- Summary Stats -->
+  <div class="wallet-stats">
+    <div class="stat-card stat-card--accent">
+      <span class="stat-label">Hoy</span>
+      <span class="stat-value" id="wallet-today">$0</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">Esta Semana</span>
+      <span class="stat-value" id="wallet-week">$0</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">Este Mes</span>
+      <span class="stat-value" id="wallet-month">$0</span>
+    </div>
+  </div>
+
+  <div class="wallet-header">
+    <h3 class="wallet-title">Últimos Viajes</h3>
+    <button id="btn-wallet-clear" class="wallet-btn-clear">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 6 5 6 21 6"></polyline>
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+      </svg>
+      Limpiar
+    </button>
+  </div>
+
+  <!-- Trips List -->
+  <div id="wallet-list" class="wallet-list">
+    <div class="wallet-empty">
+      <p class="wallet-empty-text">No has registrado viajes aún.</p>
+      <p class="wallet-empty-hint">Completa una ruta y presiona "Finalizar Viaje".</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  import { $tripRecords } from '../lib/stores';
+  import { loadTripRecords, clearTripRecords } from '../lib/db';
+  import { formatCUP } from '../lib/cost';
+  import { vibrateTap, vibrateConfirm } from '../lib/haptics';
+
+  const todayEl = document.getElementById('wallet-today')!;
+  const weekEl = document.getElementById('wallet-week')!;
+  const monthEl = document.getElementById('wallet-month')!;
+  const listEl = document.getElementById('wallet-list')!;
+  const btnClear = document.getElementById('btn-wallet-clear')!;
+
+  // Load initial data
+  loadTripRecords().then((trips) => {
+    $tripRecords.set(trips);
+  });
+
+  function isSameDay(d1: Date, d2: Date) {
+    return d1.getFullYear() === d2.getFullYear() &&
+           d1.getMonth() === d2.getMonth() &&
+           d1.getDate() === d2.getDate();
+  }
+
+  function getWeekNumber(d: Date) {
+    const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const dayNum = date.getUTCDay() || 7;
+    date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(date.getUTCFullYear(),0,1));
+    return Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1)/7);
+  }
+
+  function renderWallet() {
+    const trips = $tripRecords.get();
+    
+    // Calculate stats
+    const now = new Date();
+    const currentWeek = getWeekNumber(now);
+    
+    let sumToday = 0;
+    let sumWeek = 0;
+    let sumMonth = 0;
+
+    trips.forEach(trip => {
+      const tripDate = new Date(trip.date);
+      
+      // Today
+      if (isSameDay(now, tripDate)) {
+        sumToday += trip.totalCup;
+      }
+      
+      // This Week
+      if (tripDate.getFullYear() === now.getFullYear() && getWeekNumber(tripDate) === currentWeek) {
+        sumWeek += trip.totalCup;
+      }
+
+      // This Month
+      if (tripDate.getFullYear() === now.getFullYear() && tripDate.getMonth() === now.getMonth()) {
+        sumMonth += trip.totalCup;
+      }
+    });
+
+    todayEl.textContent = formatCUP(sumToday);
+    weekEl.textContent = formatCUP(sumWeek);
+    monthEl.textContent = formatCUP(sumMonth);
+
+    // Render list
+    if (trips.length === 0) {
+      listEl.innerHTML = `
+        <div class="wallet-empty">
+          <p class="wallet-empty-text">No has registrado viajes aún.</p>
+          <p class="wallet-empty-hint">Completa una ruta y presiona "Finalizar Viaje".</p>
+        </div>
+      `;
+    } else {
+      listEl.innerHTML = trips.map(trip => {
+        const d = new Date(trip.date);
+        const dateStr = d.toLocaleDateString('es-CU', { day: '2-digit', month: 'short' });
+        const timeStr = d.toLocaleTimeString('es-CU', { hour: '2-digit', minute: '2-digit' });
+        
+        return `
+          <div class="wallet-item">
+            <div class="wallet-item-main">
+              <span class="wallet-item-amount">${formatCUP(trip.totalCup)}</span>
+              <span class="wallet-item-details">${(trip.distanceMeters / 1000).toFixed(1)}km · ${trip.stopsCount} paradas</span>
+            </div>
+            <div class="wallet-item-meta">
+              <span>${dateStr}</span>
+              <span>${timeStr}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+
+  $tripRecords.subscribe(renderWallet);
+
+  // Clear data
+  btnClear.addEventListener('click', async () => {
+    if (confirm('¿Estás seguro de que deseas limpiar todo tu registro de ganancias? Esta acción no se puede deshacer.')) {
+      vibrateConfirm();
+      await clearTripRecords();
+      $tripRecords.set([]);
+    }
+  });
+</script>
+
+<style>
+  .wallet-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    height: 100%;
+  }
+
+  /* Stats Grid */
+  .wallet-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+  }
+
+  .stat-card {
+    display: flex;
+    flex-direction: column;
+    padding: 0.75rem;
+    border-radius: 0.75rem;
+    background: var(--bg);
+    border: 1px solid oklch(0.5 0 0 / 0.08);
+  }
+
+  .stat-card--accent {
+    background: var(--bg-elevated);
+    border-color: var(--color-brand-400);
+  }
+
+  .stat-card--accent .stat-value {
+    color: var(--color-brand-500);
+  }
+
+  .stat-label {
+    font-size: 0.625rem;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+    margin-bottom: 0.25rem;
+  }
+
+  .stat-value {
+    font-size: 1.125rem;
+    font-weight: 800;
+    color: var(--text);
+  }
+
+  /* Header */
+  .wallet-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 0.25rem;
+  }
+
+  .wallet-title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0;
+  }
+
+  .wallet-btn-clear {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    background: oklch(0.5 0 0 / 0.05);
+    border: none;
+    border-radius: 99px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: oklch(0.55 0.2 25); /* Subtle red */
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .wallet-btn-clear:hover {
+    background: oklch(0.55 0.2 25 / 0.1);
+  }
+
+  /* List */
+  .wallet-list {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+    max-height: 16rem;
+  }
+
+  .wallet-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    border-radius: 0.75rem;
+    background: var(--bg);
+    border: 1px solid oklch(0.5 0 0 / 0.05);
+  }
+
+  .wallet-item-main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+
+  .wallet-item-amount {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .wallet-item-details {
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+  }
+
+  .wallet-item-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.125rem;
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .wallet-empty {
+    text-align: center;
+    padding: 2rem 1rem;
+  }
+
+  .wallet-empty-text {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text);
+    margin: 0 0 0.25rem 0;
+  }
+
+  .wallet-empty-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin: 0;
+  }
+</style>

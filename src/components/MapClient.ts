@@ -12,7 +12,7 @@ import {
   TILE_URLS,
   TILE_ATTRIBUTION,
 } from '../lib/types';
-import type { ThemeMode, LatLng, DeliveryStop } from '../lib/types';
+import type { ThemeMode, LatLng, DeliveryStop, AvoidZone } from '../lib/types';
 import {
   $theme,
   $mapView,
@@ -22,6 +22,7 @@ import {
   $sheetState,
   $activeTab,
   addStop,
+  $avoidZones,
 } from '../lib/stores';
 import { vibrateTap, vibrateConfirm } from '../lib/haptics';
 import { calculateAllProfilesDebounced } from '../lib/routing';
@@ -118,6 +119,19 @@ export function initMap(container: HTMLElement): L.Map {
     calculateAllProfilesDebounced();
   });
 
+  // ---- Map context menu: add avoid zone ----
+  map.on('contextmenu', (e: L.LeafletMouseEvent) => {
+    vibrateTap();
+    const zone: AvoidZone = {
+      id: `zone_${Date.now()}`,
+      lat: e.latlng.lat,
+      lng: e.latlng.lng,
+      radiusMeters: 80 // Size of a general block
+    };
+    $avoidZones.set([...$avoidZones.get(), zone]);
+    calculateAllProfilesDebounced();
+  });
+
   // Sync map movement to store
   map.on('moveend', () => {
     if (!map) return;
@@ -151,6 +165,45 @@ export function initMap(container: HTMLElement): L.Map {
   // Delivery stops → numbered markers
   $stops.subscribe((stops) => {
     syncStopMarkers(stops);
+  });
+
+  // Avoid Zones
+  let avoidZoneLayers: Map<string, L.Circle> = new Map();
+  $avoidZones.subscribe((zones) => {
+    if (!map) return;
+    
+    // Remove deleted zones
+    const currentIds = new Set(zones.map((z) => z.id));
+    for (const [id, layer] of avoidZoneLayers) {
+      if (!currentIds.has(id)) {
+        map.removeLayer(layer);
+        avoidZoneLayers.delete(id);
+      }
+    }
+
+    // Add new ones
+    for (const zone of zones) {
+      if (!avoidZoneLayers.has(zone.id)) {
+        const circle = L.circle([zone.lat, zone.lng], {
+          radius: zone.radiusMeters,
+          color: '#ef4444',
+          fillColor: '#ef4444',
+          fillOpacity: 0.35,
+          weight: 2,
+        }).addTo(map);
+
+        circle.on('click', (e) => {
+          L.DomEvent.stopPropagation(e as Event);
+          if (confirm('¿Eliminar esta Zona a Evitar?')) {
+            vibrateTap();
+            $avoidZones.set($avoidZones.get().filter(z => z.id !== zone.id));
+            calculateAllProfilesDebounced();
+          }
+        });
+
+        avoidZoneLayers.set(zone.id, circle);
+      }
+    }
   });
 
   return map;

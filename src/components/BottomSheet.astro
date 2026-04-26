@@ -7,6 +7,7 @@
 import RouteControls from './RouteControls.astro';
 import CostDisplay from './CostDisplay.astro';
 import FavoritesPanel from './FavoritesPanel.astro';
+import WalletPanel from './WalletPanel.astro';
 ---
 
 <div id="bottom-sheet" class="sheet" data-state="collapsed">
@@ -28,6 +29,12 @@ import FavoritesPanel from './FavoritesPanel.astro';
         </svg>
         <span>Costo</span>
       </button>
+      <button class="sheet-tab" data-tab="wallet">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="5" width="20" height="14" rx="2"/><path d="M16 12h.01"/><path d="M12 12h.01"/><path d="M8 12h.01"/>
+        </svg>
+        <span>Finanzas</span>
+      </button>
       <button class="sheet-tab" data-tab="favorites">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
@@ -45,6 +52,9 @@ import FavoritesPanel from './FavoritesPanel.astro';
     <div class="tab-content" id="tab-content-cost" style="display:none;">
       <CostDisplay />
     </div>
+    <div class="tab-content" id="tab-content-wallet" style="display:none;">
+      <WalletPanel />
+    </div>
     <div class="tab-content" id="tab-content-favorites" style="display:none;">
       <FavoritesPanel />
     </div>
@@ -52,7 +62,7 @@ import FavoritesPanel from './FavoritesPanel.astro';
 </div>
 
 <script>
-  import { $sheetState, $activeTab } from '../lib/stores';
+  import { $sheetState, $activeTab, $tripRecords } from '../lib/stores';
   import { vibrateTap } from '../lib/haptics';
   import type { SheetTab } from '../lib/types';
 
@@ -60,8 +70,24 @@ import FavoritesPanel from './FavoritesPanel.astro';
   const handle = document.getElementById('sheet-handle');
   const tabs = document.querySelectorAll('.sheet-tab');
   const contents = document.querySelectorAll('.tab-content');
+  const walletTabBtn = document.querySelector('.sheet-tab[data-tab="wallet"]') as HTMLElement | null;
 
   if (!sheet || !handle) throw new Error('Bottom sheet elements not found');
+
+  // Dynamically hide wallet if empty
+  $tripRecords.subscribe(records => {
+    if (walletTabBtn) {
+      if (records.length === 0) {
+        walletTabBtn.style.display = 'none';
+        // If current tab is wallet, switch back to route automatically
+        if ($activeTab.get() === 'wallet') {
+          $activeTab.set('route');
+        }
+      } else {
+        walletTabBtn.style.display = 'flex';
+      }
+    }
+  });
 
   // ---- Tabs Logic ----
   function applyTab(tabId: SheetTab) {

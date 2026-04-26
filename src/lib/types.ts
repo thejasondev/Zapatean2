@@ -173,14 +173,39 @@ export type ThemeMode = 'day' | 'night';
 export type SheetState = 'collapsed' | 'half' | 'expanded';
 
 /** Bottom sheet tabs */
-export type SheetTab = 'route' | 'cost' | 'favorites';
+export type SheetTab = 'route' | 'cost' | 'favorites' | 'wallet';
 
 /** Geocoding result from Nominatim */
 export interface GeocodingResult {
   place_id: number;
   display_name: string;
   lat: string;
-  lon: string;
-  type: string;
-  importance: number;
+}
+// ============================================
+// PHASE 2 TYPES
+// ============================================
+
+/** Earnings tracker record */
+export interface TripRecord {
+  id: string;
+  date: number; // timestamp
+  distanceMeters: number;
+  totalCup: number;
+  stopsCount: number;
+  profile: TransportProfile;
+}
+
+/** Zone to avoid while routing */
+export interface AvoidZone {
+  id: string;
+  lat: number;
+  lng: number;
+  radiusMeters: number; // Always 100 or specific geometry
+}
+
+/** Offline Routes Cache format */
+export interface OfflineRouteCache {
+  hash: string;
+  timestamp: number;
+  result: RouteResult | any; // Any depending on mode
 }

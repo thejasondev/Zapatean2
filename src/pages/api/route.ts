@@ -62,7 +62,7 @@ export const POST: APIRoute = async ({ request }) => {
     );
   }
 
-  const { profile, mode = 'full' } = body;
+  const { profile, mode = 'full', avoidZones = [] } = body;
 
   // ---- Validation ----
   if (coordinates.length < 2 || coordinates.length > 10) {
@@ -92,6 +92,31 @@ export const POST: APIRoute = async ({ request }) => {
     }
   }
 
+  // ---- Avoid Zones to GeoJSON MultiPolygon ----
+  let options: any = undefined;
+  if (avoidZones && Array.isArray(avoidZones) && avoidZones.length > 0) {
+    const polygons = avoidZones.map((zone: any) => {
+      const lat = zone.lat;
+      const lng = zone.lng;
+      const r = zone.radiusMeters || 100;
+      const dy = r / 111320;
+      const dx = r / (111320 * Math.cos((lat * Math.PI) / 180));
+      return [[
+        [lng - dx, lat - dy],
+        [lng + dx, lat - dy],
+        [lng + dx, lat + dy],
+        [lng - dx, lat + dy],
+        [lng - dx, lat - dy]
+      ]];
+    });
+    options = {
+      avoid_polygons: {
+        type: 'MultiPolygon',
+        coordinates: polygons
+      }
+    };
+  }
+
   // ---- Build ORS request ----
   const format = mode === 'full' ? 'geojson' : 'json';
   const orsUrl = `${ORS_BASE_URL}/${profile}/${format}`;
@@ -99,17 +124,20 @@ export const POST: APIRoute = async ({ request }) => {
   const orsCoordinates = coordinates.map((c) => [c.lng, c.lat]);
 
   try {
+    const requestBody: any = {
+      coordinates: orsCoordinates,
+      instructions: mode === 'full',
+      language: 'es',
+    };
+    if (options) requestBody.options = options;
+
     const orsResponse = await fetch(orsUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: apiKey,
       },
-      body: JSON.stringify({
-        coordinates: orsCoordinates,
-        instructions: mode === 'full',
-        language: 'es',
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!orsResponse.ok) {
