@@ -47,6 +47,19 @@
     }
   });
 
+  // Auto-start GPS if permission was previously granted
+  if ('permissions' in navigator) {
+    navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+      if (result.state === 'granted' && !hasStartedWatch) {
+        startWatching();
+        hasStartedWatch = true;
+        getOneTimePosition()
+          .then(() => centerOnUser())
+          .catch(e => console.warn('[Zapatean2] Auto-GPS failed:', e));
+      }
+    });
+  }
+
   // Update button style when GPS is active
   $userPosition.subscribe((pos) => {
     if (pos && btn) {
