@@ -7,17 +7,19 @@
 <div id="wallet-panel" class="wallet-panel">
   <!-- Summary Stats -->
   <div class="wallet-stats">
-    <div class="stat-card stat-card--accent">
-      <span class="stat-label">Hoy</span>
+    <div class="stat-card stat-card--hero">
+      <span class="stat-label">Ganancias de Hoy</span>
       <span class="stat-value" id="wallet-today">$0</span>
     </div>
-    <div class="stat-card">
-      <span class="stat-label">Esta Semana</span>
-      <span class="stat-value" id="wallet-week">$0</span>
-    </div>
-    <div class="stat-card">
-      <span class="stat-label">Este Mes</span>
-      <span class="stat-value" id="wallet-month">$0</span>
+    <div class="wallet-stats-row">
+      <div class="stat-card">
+        <span class="stat-label">Esta Semana</span>
+        <span class="stat-value" id="wallet-week">$0</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Este Mes</span>
+        <span class="stat-value" id="wallet-month">$0</span>
+      </div>
     </div>
   </div>
 
@@ -139,12 +141,36 @@
   $tripRecords.subscribe(renderWallet);
 
   // Clear data
-  btnClear.addEventListener('click', async () => {
-    if (confirm('¿Estás seguro de que deseas limpiar todo tu registro de ganancias? Esta acción no se puede deshacer.')) {
+  btnClear.addEventListener('click', () => {
+    vibrateTap();
+    // Custom Clear Modal
+    const overlay = document.createElement('div');
+    overlay.className = 'zap-modal-overlay';
+    overlay.innerHTML = `
+      <div class="zap-modal">
+        <div class="zap-modal-icon">🗑️</div>
+        <h3 class="zap-modal-title" style="color: #ef4444;">Reiniciar Billetera</h3>
+        <p class="zap-modal-text">¿Estás seguro de limpiar todo tu registro de ganancias? Esta acción no se puede deshacer.</p>
+        <div class="zap-modal-actions">
+          <button id="zap-clear-cancel" class="zap-modal-btn zap-modal-btn--ghost">Cancelar</button>
+          <button id="zap-clear-confirm" class="zap-modal-btn" style="background: #ef4444; color: white;">Sí, vaciar</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const closeOverlay = () => {
+      overlay.classList.add('zap-modal-overlay--closing');
+      setTimeout(() => overlay.remove(), 250);
+    };
+
+    document.getElementById('zap-clear-cancel')!.addEventListener('click', closeOverlay);
+    document.getElementById('zap-clear-confirm')!.addEventListener('click', async () => {
+      closeOverlay();
       vibrateConfirm();
       await clearTripRecords();
       $tripRecords.set([]);
-    }
+    });
   });
 </script>
 
@@ -158,42 +184,60 @@
 
   /* Stats Grid */
   .wallet-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .wallet-stats-row {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: 1fr 1fr;
     gap: 0.5rem;
   }
 
   .stat-card {
     display: flex;
     flex-direction: column;
-    padding: 0.75rem;
-    border-radius: 0.75rem;
+    padding: 1rem;
+    border-radius: 1rem;
     background: var(--bg);
     border: 1px solid oklch(0.5 0 0 / 0.08);
+    position: relative;
+    overflow: hidden;
   }
 
-  .stat-card--accent {
-    background: var(--bg-elevated);
-    border-color: var(--color-brand-400);
+  .stat-card--hero {
+    background: linear-gradient(135deg, oklch(0.6 0.15 155), oklch(0.5 0.15 155));
+    border: none;
+    color: white;
+    padding: 1.25rem 1.5rem;
+    box-shadow: 0 4px 12px oklch(0.6 0.15 155 / 0.2);
   }
 
-  .stat-card--accent .stat-value {
-    color: var(--color-brand-500);
+  .stat-card--hero .stat-label {
+    color: rgba(255,255,255,0.8);
+  }
+
+  .stat-card--hero .stat-value {
+    color: white;
+    font-size: 2rem;
   }
 
   .stat-label {
-    font-size: 0.625rem;
+    font-size: 0.6875rem;
     text-transform: uppercase;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--text-muted);
     letter-spacing: 0.05em;
     margin-bottom: 0.25rem;
+    z-index: 1;
   }
 
   .stat-value {
-    font-size: 1.125rem;
+    font-size: 1.25rem;
     font-weight: 800;
     color: var(--text);
+    z-index: 1;
   }
 
   /* Header */
