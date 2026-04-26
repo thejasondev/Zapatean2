@@ -160,6 +160,24 @@ export async function generateReceiptAndShare(data: {
     if (!blob) return;
     const file = new File([blob], `Recibo_Zapatean2_CUP_${data.costCup}.png`, { type: 'image/png' });
     
+    const showFallback = () => {
+      const url = URL.createObjectURL(blob);
+      const overlay = document.createElement('div');
+      overlay.className = 'zap-modal-overlay';
+      overlay.innerHTML = `
+        <div class="zap-modal" style="padding: 1rem; max-width: 90vw; transform: scale(1); opacity: 1; animation: none;">
+          <p style="margin: 0 0 0.75rem; font-size: 0.875rem; color: var(--text); font-weight: bold;">Mantén presionada la imagen para guardarla o compartirla</p>
+          <img src="${url}" style="width: 100%; border-radius: 0.5rem; border: 1px solid oklch(0.5 0 0 / 0.1);" />
+          <button id="close-img-btn" class="zap-modal-btn zap-modal-btn--ghost" style="margin-top: 1rem; width: 100%;">Cerrar</button>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      document.getElementById('close-img-btn')!.addEventListener('click', () => {
+        overlay.remove();
+        URL.revokeObjectURL(url);
+      });
+    };
+
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
         await navigator.share({
@@ -168,17 +186,17 @@ export async function generateReceiptAndShare(data: {
           files: [file]
         });
       } catch (err) {
-        // User cancelled or failure, fallback to download
-        console.log('Share cancelled or failed');
+        // User cancelled or failure, fallback to image modal
+        console.log('Share cancelled or failed', err);
+        // Only show fallback if it's an actual failure, not user cancellation
+        // Usually NotAllowedError means user cancelled or gesture was lost
+        if ((err as Error).name !== 'AbortError') {
+          showFallback();
+        }
       }
     } else {
-      // Fallback: direct download
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = file.name;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      // Fallback: visual modal
+      showFallback();
     }
   }, 'image/png');
 }

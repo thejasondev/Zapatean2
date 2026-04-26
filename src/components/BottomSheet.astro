@@ -224,7 +224,10 @@ import WalletPanel from './WalletPanel.astro';
     padding-bottom: var(--spacing-safe-bottom);
     transition: transform 0.45s var(--ease-sheet), opacity 0.3s ease;
     will-change: transform, opacity;
-    touch-action: none;
+  }
+
+  .sheet-handle {
+    touch-action: none; /* Only the handle disables native scroll */
   }
 
   .sheet[data-state="half"],

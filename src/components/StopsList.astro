@@ -59,6 +59,7 @@ import { MAX_STOPS } from '../lib/types';
   import { vibrateTap } from '../lib/haptics';
   import { MAX_STOPS } from '../lib/types';
   import { saveTripRecord, loadTripRecords } from '../lib/db';
+  import { generateReceiptAndShare } from '../lib/receipt';
 
   const emptyEl = document.getElementById('stops-empty')!;
   const listEl = document.getElementById('stops-list')!;
@@ -210,11 +211,46 @@ import { MAX_STOPS } from '../lib/types';
     const defaultCost = Math.round(distKm * config.pricePerKm);
     const finalVal = manual ? parseInt(manual) : defaultCost;
 
-    const input = window.prompt('Finalizar Viaje\nIntroduce el importe final cobrado al cliente (CUP):', finalVal.toString());
-    if (input === null) return; // Cancelled
-    
-    const cost = parseInt(input) || 0;
+    // Custom Price Prompt Overlay
+    const promptOverlay = document.createElement('div');
+    promptOverlay.className = 'zap-modal-overlay';
+    promptOverlay.innerHTML = `
+      <div class="zap-modal">
+        <div class="zap-modal-icon">💵</div>
+        <h3 class="zap-modal-title">Finalizar Viaje</h3>
+        <p class="zap-modal-text" style="margin-bottom: 0.5rem">Confirma el importe cobrado al cliente:</p>
+        <div style="position:relative; margin-bottom: 1rem;">
+          <span style="position:absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-weight: bold;">$</span>
+          <input type="number" id="zap-price-input" class="zap-modal-input" value="${finalVal}" step="1" min="0" />
+          <span style="position:absolute; right: 1rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.75rem;">CUP</span>
+        </div>
+        <div class="zap-modal-actions" style="margin-top:0">
+          <button id="zap-price-cancel" class="zap-modal-btn zap-modal-btn--ghost">Cancelar</button>
+          <button id="zap-price-confirm" class="zap-modal-btn zap-modal-btn--primary">Cobrar</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(promptOverlay);
 
+    const inputField = document.getElementById('zap-price-input') as HTMLInputElement;
+    // Auto-focus the input
+    setTimeout(() => inputField.focus(), 100);
+
+    const closePrompt = () => {
+      promptOverlay.classList.add('zap-modal-overlay--closing');
+      setTimeout(() => promptOverlay.remove(), 250);
+    };
+
+    document.getElementById('zap-price-cancel')!.addEventListener('click', closePrompt);
+    document.getElementById('zap-price-confirm')!.addEventListener('click', () => {
+      const cost = parseInt(inputField.value) || 0;
+      closePrompt();
+      processTripFinish(cost, route, stops, distKm);
+    });
+  });
+
+  // Extracted finish logic to run after custom prompt confirmation
+  function processTripFinish(cost: number, route: any, stops: any[], distKm: number) {
     const record = {
       id: `trip_${Date.now()}`,
       date: Date.now(),
@@ -256,10 +292,8 @@ import { MAX_STOPS } from '../lib/types';
       };
 
       document.getElementById('zap-modal-no')!.addEventListener('click', closeOverlay);
-      document.getElementById('zap-modal-yes')!.addEventListener('click', async () => {
+      document.getElementById('zap-modal-yes')!.addEventListener('click', () => {
         closeOverlay();
-        // Dynamically import receipt logic
-        const { generateReceiptAndShare } = await import('../lib/receipt');
         generateReceiptAndShare({
           date: record.date,
           distanceKm: distKm,
@@ -269,7 +303,7 @@ import { MAX_STOPS } from '../lib/types';
         });
       });
     });
-  });
+  }
 </script>
 
 <style>
@@ -544,6 +578,12 @@ import { MAX_STOPS } from '../lib/types';
   }
   :global(.zap-modal-actions) {
     display: flex; gap: 0.5rem; margin-top: 1.5rem;
+  }
+  :global(.zap-modal-input) {
+    width: 100%; padding: 0.875rem 2.5rem 0.875rem 2rem; border-radius: 0.75rem; 
+    border: 2px solid var(--color-brand-500); background: var(--bg);
+    color: var(--text); font-size: 1.25rem; font-weight: 700; text-align: center;
+    font-family: var(--font-sans); outline: none;
   }
   :global(.zap-modal-btn) {
     flex: 1; padding: 0.75rem; border-radius: 0.75rem; border: none; font-weight: 600; cursor: pointer; transition: all 0.2s; font-family: var(--font-sans);
