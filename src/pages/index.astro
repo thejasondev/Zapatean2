@@ -72,7 +72,7 @@ import BottomSheet from '../components/BottomSheet.astro';
   }
 
   .panel-toggle-btn {
-    display: none; /* Hidden on mobile, BottomSheet handle does the job */
+    display: flex; /* Now visible on mobile */
   }
 
   /* 
@@ -85,10 +85,6 @@ import BottomSheet from '../components/BottomSheet.astro';
       top: calc(4.5rem + env(safe-area-inset-top, 0px));
       left: 0.75rem;
       right: auto;
-    }
-
-    .panel-toggle-btn {
-      display: flex;
     }
   }
 </style>

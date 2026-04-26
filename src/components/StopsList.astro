@@ -230,9 +230,35 @@ import { MAX_STOPS } from '../lib/types';
       clearRoute();
       $sheetState.set('collapsed');
       
-      const wantsReceipt = window.confirm(`¡Viaje registrado! Ganancia: $${cost} CUP.\n\n¿Deseas generar y compartir el Recibo Digital con el cliente?`);
-      if (wantsReceipt) {
-        // Dynamically import receipt logic to keep bundle small until used
+      // Custom Notification Overlay
+      const overlay = document.createElement('div');
+      overlay.className = 'zap-modal-overlay';
+      overlay.innerHTML = `
+        <div class="zap-modal">
+          <div class="zap-modal-icon">🎉</div>
+          <h3 class="zap-modal-title">¡Viaje Completado!</h3>
+          <p class="zap-modal-text">Has registrado una ganancia de <strong style="color:var(--color-brand-500)">$${cost} CUP</strong> en tu Billetera.</p>
+          <p class="zap-modal-text">¿Deseas generar y compartir el recibo digital con tu cliente?</p>
+          <div class="zap-modal-actions">
+            <button id="zap-modal-no" class="zap-modal-btn zap-modal-btn--ghost">No, gracias</button>
+            <button id="zap-modal-yes" class="zap-modal-btn zap-modal-btn--primary">Sí, enviar recibo</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      const closeOverlay = () => {
+        overlay.classList.add('zap-modal-overlay--closing');
+        setTimeout(() => overlay.remove(), 250);
+        // Switch to wallet to see the money!
+        $activeTab.set('wallet');
+        $sheetState.set('half');
+      };
+
+      document.getElementById('zap-modal-no')!.addEventListener('click', closeOverlay);
+      document.getElementById('zap-modal-yes')!.addEventListener('click', async () => {
+        closeOverlay();
+        // Dynamically import receipt logic
         const { generateReceiptAndShare } = await import('../lib/receipt');
         generateReceiptAndShare({
           date: record.date,
@@ -241,7 +267,7 @@ import { MAX_STOPS } from '../lib/types';
           stopsCount: record.stopsCount,
           addresses
         });
-      }
+      });
     });
   });
 </script>
@@ -287,7 +313,7 @@ import { MAX_STOPS } from '../lib/types';
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    max-height: 16rem;
+    max-height: 35vh;
     overflow-y: auto;
     padding-right: 0.25rem;
   }
@@ -482,4 +508,53 @@ import { MAX_STOPS } from '../lib/types';
     color: var(--text-muted);
     letter-spacing: 0.02em;
   }
+
+  /* Custom Modal Styles injected globally */
+  :global(.zap-modal-overlay) {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.4); backdrop-filter: blur(4px);
+    z-index: 10000;
+    display: flex; align-items: center; justify-content: center;
+    padding: 1.5rem;
+    animation: zapFadeIn 0.25s ease forwards;
+  }
+  :global(.zap-modal-overlay--closing) {
+    animation: zapFadeOut 0.2s ease forwards;
+  }
+  :global(.zap-modal) {
+    background: var(--bg-elevated);
+    border-radius: 1.25rem;
+    padding: 1.5rem;
+    width: 100%;
+    max-width: 340px;
+    box-shadow: 0 20px 40px oklch(0 0 0 / 0.2);
+    text-align: center;
+    transform: scale(0.95);
+    opacity: 0;
+    animation: zapPopIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.05s forwards;
+  }
+  :global(.zap-modal-icon) {
+    font-size: 3rem; margin-bottom: 0.5rem;
+  }
+  :global(.zap-modal-title) {
+    margin: 0 0 0.5rem; font-size: 1.25rem; color: var(--text); font-family: var(--font-sans); font-weight: 800;
+  }
+  :global(.zap-modal-text) {
+    margin: 0 0 1rem; font-size: 0.875rem; color: var(--text-muted); font-family: var(--font-sans); line-height: 1.4;
+  }
+  :global(.zap-modal-actions) {
+    display: flex; gap: 0.5rem; margin-top: 1.5rem;
+  }
+  :global(.zap-modal-btn) {
+    flex: 1; padding: 0.75rem; border-radius: 0.75rem; border: none; font-weight: 600; cursor: pointer; transition: all 0.2s; font-family: var(--font-sans);
+  }
+  :global(.zap-modal-btn--ghost) {
+    background: oklch(0.5 0 0 / 0.06); color: var(--text);
+  }
+  :global(.zap-modal-btn--primary) {
+    background: var(--color-brand-500); color: white;
+  }
+  @keyframes zapFadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes zapFadeOut { from { opacity: 1; } to { opacity: 0; } }
+  @keyframes zapPopIn { to { transform: scale(1); opacity: 1; } }
 </style>
